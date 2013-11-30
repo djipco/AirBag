@@ -3,3 +3,9 @@
 /releases
 /bin
 /.gitignore
+
+.project
+
+.settings/org.eclipse.core.resources.prefs
+
+doc/validation_errors.log
