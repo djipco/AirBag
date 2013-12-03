@@ -26,14 +26,37 @@ package cc.cote.airbag
 {
 	import flash.display.BitmapData;
 	import flash.display.DisplayObject;
+	import flash.display.Shape;
 	import flash.errors.EOFError;
+	import flash.events.Event;
+	import flash.events.EventDispatcher;
 	import flash.geom.ColorTransform;
 	import flash.geom.Matrix;
 	import flash.geom.Point;
 	import flash.geom.Rectangle;
+	import flash.text.AntiAliasType;
 	import flash.text.TextField;
 	import flash.utils.ByteArray;
 	import flash.utils.getQualifiedClassName;
+	
+	
+	/**
+	 * Dispatched each time <code>AirBag</code> performs its detection routine. This typically is on
+	 * each <code>ENTER_FRAME</code> but can be altered by the <code>skip</code> property.
+	 * 
+	 * @eventType cc.cote.airbag.AirBagEvent.DETECTION
+	 * @since 1.0a rev1
+	 */
+	[Event(name="detection",type="cc.cote.airbag.AirBagEvent")]
+	
+	/**
+	 * Dispatched when <code>AirBag</code> detects at least one collision during its scheduled 
+	 * detection run.
+	 * 
+	 * @eventType cc.cote.airbag.AirBagEvent.COLLISION
+	 * @since 1.0a rev1
+	 */
+	[Event(name="collision",type="cc.cote.airbag.AirBagEvent")]
 	
 	/**
 	 * The <code><b>AirBag</b></code> class allows the pixel-precise detection of collisions amongst 
@@ -76,8 +99,8 @@ package cc.cote.airbag
 	 * the constructor and/or with the <code>add()</code> method: </p>
 	 * 
 	 * <listing version="3.0">
-	 * public var ab:AirBag = new AirBag(obj1, obj2, obj3);
-	 * ab.add(obj4, obj5);</listing>
+	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
+	 * airbag.add(obj4, obj5);</listing>
 	 * 
 	 * <p>Then, you call the <code>checkCollisions()</code> method whenever appropriate. For 
 	 * example, you can continually check for collisions by using an <code>ENTER_FRAME</code>
@@ -87,7 +110,7 @@ package cc.cote.airbag
 	 * addEventListener(Event.ENTER_FRAME, checkCollisions);
 	 * 
 	 * public function checkCollisions(e:Event):void {
-	 * 	var collisions:Vector.&lt;Collision&gt; = ab.checkCollisions();
+	 * 	var collisions:Vector.&lt;Collision&gt; = airbag.checkCollisions();
 	 * 	if (collisions.length) {
 	 * 		trace("Collision detected!");
 	 * 	}
@@ -97,20 +120,39 @@ package cc.cote.airbag
 	 * <code>singleTarget</code> property:</p>
 	 * 
 	 * <listing version="3.0">
-	 * public var ab:AirBag = new AirBag(obj1, obj2, obj3);
-	 * ab.singleTarget(obj4);</listing>
+	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
+	 * airbag.singleTarget(obj4);</listing>
 	 * 
 	 * <p>This will report all collisions of <code>obj1</code>, <code>obj2</code> and 
 	 * <code>obj3</code> with <code>obj4</code> but won't report collisions of <code>obj1</code>, 
 	 * <code>obj2</code> and <code>obj3</code> with themselves.</p>
 	 * 
+	 * <p>Starting in version 1.0a rev1, you can listen to events directly on the <code>AirBag</code>
+	 * object.</p>
+	 * 
+	 * <listing version="3.0">
+	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
+	 * airbag.addEventListener(AirBagEvent.DETECTION, onDetection);
+	 * 
+	 * public function onDetection(e:Event):void {
+	 * 	if (e.collisions.length) {
+	 * 		trace("Collision detected!");
+	 * 	}
+	 * }</listing>
+	 * 
+	 * <p>The <code>AirBagEvent.DETECTION</code> event is triggered each time detection is performed 
+	 * (typically on <code>ENTER_FRAME</code> unless the <code>skip</code> property is used). The 
+	 * <code>AirBagEvent.COLLISION</code> event is triggered only when at least one collision is 
+	 * found in a detection run.</p>
+	 * 
 	 * @see cc.cote.airbag.Collision
+	 * @see cc.cote.airbag.AirBagEvent
 	 * @see http://cote.cc/projects/airbag Official AirBag project page
 	 */
-	public class AirBag
+	public class AirBag extends EventDispatcher
 	{
 		/** Current version of the library. */
-		public static const VERSION:String = '1.0a';
+		public static const VERSION:String = '1.0a rev1';
 		
 		/** Constant defining a ONE_TO_MANY detection mode. */
 		public static const ONE_TO_MANY:String = 'oneToMany';
@@ -168,6 +210,15 @@ package cc.cote.airbag
 		/** @private */
 		protected var item2Registration:Point;
 		
+		/** @private */
+		protected var _enterFrameCatcher:Shape;
+
+		/** @private */
+		protected var _skip:uint;
+
+		/** @private */
+		protected var _skipCounter:uint;
+		
 		/**
 		 * Creates an <code>AirBag</code> object from the <code>DisplayObject</code>s passed as 
 		 * parameters. The <code>DisplayObject</code>s to use can be specified by passing any of the 
@@ -204,6 +255,8 @@ package cc.cote.airbag
 			objectArray = new <DisplayObject>[];
 			colorExclusionArray = [];
 			_alphaThreshold = 0;
+			_skip = 0;
+			_skipCounter = 0;
 
 			for each (var obj:* in objects) add(obj);
 			
@@ -431,6 +484,72 @@ package cc.cote.airbag
 		}
 		
 		/**
+		 * Starts the collision detection process. On <code>ENTER_FRAME</code>, <code>AirBag</code>
+		 * will check if any collisions happened and, if at least one was detected, it will dispatch 
+		 * a <code>CollisionEvent</code> object.
+		 * 
+		 * <p>If you want to use a higher frame rate for your application than for collision 
+		 * detection, you can use the <code>skip</code> property.</p>
+		 * 
+		 * <p>Important: do not forget to call <code>stop()</code> when you are done with 
+		 * detection.</p>
+		 * 
+		 * @since 1.0a rev1
+		 */
+		public function start():void {
+			!_enterFrameCatcher && (_enterFrameCatcher = new Shape());
+			_enterFrameCatcher.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
+			
+		}
+
+		/**
+		 * Stops the collision detection process.
+		 * 
+		 * @since 1.0a rev1
+		 */
+		public function stop():void {
+			_enterFrameCatcher.removeEventListener(Event.ENTER_FRAME, _onEnterFrame);
+		}
+		
+		/** @private */
+		protected function _onEnterFrame(e:Event):void {
+			
+			if (_skipCounter % (_skip + 1) == 0) {
+
+				_skipCounter = 1;
+				
+				
+				
+				var collisions:Vector.<Collision> = checkCollisions();
+
+				dispatchEvent(
+					new AirBagEvent(AirBagEvent.DETECTION, false, false, collisions)
+				);
+				
+				if (collisions.length) {
+					dispatchEvent(
+						new AirBagEvent(AirBagEvent.COLLISION, false, false, collisions)
+					);
+				}
+
+			} else {
+				_skipCounter++;
+			}
+			
+		}
+		
+		/**
+		 * Properly disposes of the object. You should always use <code>dispose()</code> instead of 
+		 * setting the object to <code>null</code>.
+		 */
+		public function dispose():void {
+			if (_enterFrameCatcher.hasEventListener(Event.ENTER_FRAME)) {
+				_enterFrameCatcher.removeEventListener(Event.ENTER_FRAME, _onEnterFrame);
+			}
+		}
+		
+		
+		/**
 		 * Adds a color to the color exclusion list. Pixels whose values are within the specified 
 		 * range will not trigger a collision.
 		 * 
@@ -532,52 +651,70 @@ package cc.cote.airbag
 			includeOverlapData:Boolean = false
 		):void {
 			
-			var item1_isText:Boolean = false;
-			var item2_isText:Boolean = false;
+			var item1IsUsingAdvancedAntiAliasing:Boolean = false;
+			var item2IsUsingAdvancedAntiAliasing:Boolean = false;
 			var item1xDiff:Number;
 			var item1yDiff:Number;
 			
-			if (item1 is TextField) {
-				item1_isText = ((item1 as TextField).antiAliasType == "advanced") ? true : false;
-				(item1 as TextField).antiAliasType = ((item1 as TextField).antiAliasType == "advanced") ? "normal" : (item1 as TextField).antiAliasType;
+			// If the item is a Textfield and is using "advanced" anti-aliasing, switch it to
+			// "normal" anti-aliasing while we perform detection
+			if (item1 is TextField && (item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) {
+				item1IsUsingAdvancedAntiAliasing = true;
+				(item1 as TextField).antiAliasType = AntiAliasType.NORMAL;
+				
+//				item1IsUsingAdvancedAntiAliasing = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? true : false;
+//				(item1 as TextField).antiAliasType = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? AntiAliasType.NORMAL : (item1 as TextField).antiAliasType;
 			}
 			
-			if(item2 is TextField) {
-				item2_isText = ((item2 as TextField).antiAliasType == "advanced") ? true : false;
-				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
+			if (item2 is TextField && (item2 as TextField).antiAliasType == AntiAliasType.ADVANCED) {
+				item2IsUsingAdvancedAntiAliasing = true;
+				(item2 as TextField).antiAliasType = AntiAliasType.NORMAL;
 			}
+			
+//			if(item2 is TextField) {
+//				item2IsUsingAdvancedAntiAliasing = ((item2 as TextField).antiAliasType == "advanced") ? true : false;
+//				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
+//			}
 			
 			colorTransform1 = item1.transform.colorTransform;
 			colorTransform2 = item2.transform.colorTransform;
 			
+			// We store 0,0 of the item in global coordinates
 			item1Registration = new Point();
 			item2Registration = new Point();
-			
 			item1Registration = item1.localToGlobal(item1Registration);
 			item2Registration = item2.localToGlobal(item2Registration);
 			
+			// We create transparent BitmapDatas for both items
 			bmd1 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);  
 			bmd2 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);
 			
+			// we recuperate the transform matrix for object 1
 			transMatrix1 = item1.transform.matrix;
 			
+			// Combine matrices of the object1 and all parents into one
 			var currentObj:DisplayObject = item1;
 			while (currentObj.parent != null) {
 				transMatrix1.concat(currentObj.parent.transform.matrix);
 				currentObj = currentObj.parent;
 			}
 			
+			// Get bounds of item1 (accounting for parent movement if any)
 			rect1 = item1.getBounds(currentObj);
 			if (item1 != currentObj) {
 				rect1.x += currentObj.x;
 				rect1.y += currentObj.y;
 			}
 			
+			// We take the global registration point and calculate a global translation point for the 
+			// matrix
 			transMatrix1.tx = item1xDiff = (item1Registration.x - rect1.left);
 			transMatrix1.ty = item1yDiff = (item1Registration.y - rect1.top);
 			
+			// we recuperate the transform matrix for object 2
 			transMatrix2 = item2.transform.matrix;
 			
+			// Combine matrices of the object2 and all parents into one
 			currentObj = item2;
 			while(currentObj.parent != null) {
 				transMatrix2.concat(currentObj.parent.transform.matrix);
@@ -587,6 +724,7 @@ package cc.cote.airbag
 			transMatrix2.tx = (item2Registration.x - rect1.left);
 			transMatrix2.ty = (item2Registration.y - rect1.top);
 			
+			// We finally draw
 			bmd1.draw(item1, transMatrix1, colorTransform1, null, null, true);
 			bmd2.draw(item2, transMatrix2, colorTransform2, null, null, true);
 			
@@ -717,11 +855,11 @@ package cc.cote.airbag
 				objectCollisionArray.push(recordedCollision);
 			}
 			
-			if(item1_isText) (item1 as TextField).antiAliasType = "advanced";
+			if(item1IsUsingAdvancedAntiAliasing) (item1 as TextField).antiAliasType = "advanced";
 			
-			if(item2_isText) (item2 as TextField).antiAliasType = "advanced";
+			if(item2IsUsingAdvancedAntiAliasing) (item2 as TextField).antiAliasType = "advanced";
 			
-			item1_isText = item2_isText = false;
+			item1IsUsingAdvancedAntiAliasing = item2IsUsingAdvancedAntiAliasing = false;
 
 		}
 		
@@ -831,7 +969,7 @@ package cc.cote.airbag
 		/**
 		 * Returns a string representation of the object. Useful mostly for debugging purposes.
 		 */
-		public function toString():String {
+		public override function toString():String {
 			return 	'[' + getQualifiedClassName(this).match("[^:]*$")[0] + 
 				' numObjects=' + numObjects + 
 				', mode=' + ((mode ==  ONE_TO_MANY) ? 'ONE_TO_MANY' : 'MANY_TO_MANY') + 
@@ -974,6 +1112,31 @@ package cc.cote.airbag
 		public function set ignoreInvisibles(value:Boolean):void {
 			_ignoreInvisibles = value;
 		}
+
+		/** 
+		 * The number of frames to skip when performing detection. By default, <code>AirBag</code>
+		 * performs collision detection for each <code>ENTER_FRAME</code> event. This can be changed 
+		 * by modifying the <code>skip</code> property. For example, if <code>skip</code> is set to 
+		 * 3, <code>AirBag</code> will perform detection on the first <code>ENTER_FRAME</code> 
+		 * event and skip the next 3 <code>ENTER_FRAME</code> events before performing detection 
+		 * again. This is useful if you want to use a different frame rate for your application and
+		 * for collision detection.
+		 * 
+		 * @default 0
+		 * @since 1.0a rev1
+		 */
+		public function get skip():uint {
+			return _skip;
+		}
+
+		/**
+		 * @private
+		 */
+		public function set skip(value:uint):void {
+			_skipCounter = 0;
+			_skip = value;
+		}
+
 
 	}
 	

@@ -1,0 +1,20 @@
+
+Release notes
+
+********************************************************************************
+1.0a rev1
+
+	- AirBag now extends the EventDispatcher class. It is now therefore possible 
+	  to listen to the following events: AirBagEvent.COLLISION (when at least 
+	  one collision is detected) and AirBagEvent.DETECTION (whenever detection
+	  is performed, typically on ENTER_FRAME).
+	 
+	- New AirBagEvent class.
+	
+	- Updated doc and examples.
+
+
+********************************************************************************
+1.0a 
+
+	- Initial release
