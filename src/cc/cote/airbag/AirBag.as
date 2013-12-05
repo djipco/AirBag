@@ -83,7 +83,7 @@ package cc.cote.airbag
 	 *   <li><code>Array</code> of <code>DisplayObject</code>s</li>
 	 * </ul>
 	 * 
- 	 * <p>By default, collision detection works in a <b>many-to-many</b> relationship. That
+	 * <p>By default, collision detection works in a <b>many-to-many</b> relationship. That
 	 * is, all objects will be checked against all other objects when calling the 
 	 * <code>checkCollisions()</code> method.</p>
 	 * 
@@ -156,7 +156,7 @@ package cc.cote.airbag
 		
 		/** Constant defining a ONE_TO_MANY detection mode. */
 		public static const ONE_TO_MANY:String = 'oneToMany';
-
+		
 		/** Constant defining a MANY_TO_MANY detection mode. */
 		public static const MANY_TO_MANY:String = 'manyToMany';
 		
@@ -168,9 +168,9 @@ package cc.cote.airbag
 		protected var _ignoreParentless:Boolean = true;
 		/** @private */
 		protected var _ignoreInvisibles:Boolean = true;
-						
+		
 		/** @private */
-		protected var _alphaThreshold:Number;
+		protected var _alphaThreshold:uint;
 		/** @private **/
 		protected var _mode:String = MANY_TO_MANY;
 		
@@ -194,9 +194,9 @@ package cc.cote.airbag
 		/** @private */
 		protected var pixels2:ByteArray;
 		/** @private */
-		protected var rect1:Rectangle;
+		protected var item1BoundingBox:Rectangle;
 		/** @private */
-		protected var rect2:Rectangle;
+		protected var item2BoundingBox:Rectangle;
 		/** @private */
 		protected var transMatrix1:Matrix;
 		/** @private */
@@ -206,16 +206,16 @@ package cc.cote.airbag
 		/** @private */
 		protected var colorTransform2:ColorTransform;
 		/** @private */
-		protected var item1Registration:Point;
+		protected var item1GlobalRegistrationPoint:Point;
 		/** @private */
-		protected var item2Registration:Point;
+		protected var item2GlobalRegistrationPoint:Point;
 		
 		/** @private */
 		protected var _enterFrameCatcher:Shape;
-
+		
 		/** @private */
 		protected var _skip:uint;
-
+		
 		/** @private */
 		protected var _skipCounter:uint;
 		
@@ -254,10 +254,10 @@ package cc.cote.airbag
 			objectCollisionArray = new <Collision>[];
 			objectArray = new <DisplayObject>[];
 			colorExclusionArray = [];
-			_alphaThreshold = 0;
+			_alphaThreshold = 1;
 			_skip = 0;
 			_skipCounter = 0;
-
+			
 			for each (var obj:* in objects) add(obj);
 			
 		}
@@ -280,7 +280,7 @@ package cc.cote.airbag
 			
 			for each (var object:* in objects) {
 				
-			if (object is Vector.<DisplayObject>) {					// Vector.<DisplayObject>
+				if (object is Vector.<DisplayObject>) {					// Vector.<DisplayObject>
 					objectArray = objectArray.concat(object);
 				} else if (object is DisplayObject) {				// DisplayObject
 					objectArray.push(object);
@@ -411,7 +411,7 @@ package cc.cote.airbag
 				if (ignoreParentless && !item2.parent) break;
 				
 				if (item1.hitTestObject(item2)) {
-
+					
 					// THIS IS SUPER FUCKING IMPORTANT FOR PERFORMANCE !!!!!!!!!
 					if((item2.width * item2.height) > (item1.width * item1.height)) {
 						objectCheckArray.push(new <DisplayObject>[item1,item2])
@@ -478,6 +478,7 @@ package cc.cote.airbag
 					calculateAngles, 
 					calculateOverlap
 				);
+//				_quicklyFindCollisions(objectCheckArray[i][0], objectCheckArray[i][1]);
 			}
 			
 			return objectCollisionArray;
@@ -499,9 +500,8 @@ package cc.cote.airbag
 		public function start():void {
 			!_enterFrameCatcher && (_enterFrameCatcher = new Shape());
 			_enterFrameCatcher.addEventListener(Event.ENTER_FRAME, _onEnterFrame);
-			
 		}
-
+		
 		/**
 		 * Stops the collision detection process.
 		 * 
@@ -515,13 +515,13 @@ package cc.cote.airbag
 		protected function _onEnterFrame(e:Event):void {
 			
 			if (_skipCounter % (_skip + 1) == 0) {
-
+				
 				_skipCounter = 1;
 				
 				
 				
 				var collisions:Vector.<Collision> = checkCollisions();
-
+				
 				dispatchEvent(
 					new AirBagEvent(AirBagEvent.DETECTION, false, false, collisions)
 				);
@@ -531,7 +531,7 @@ package cc.cote.airbag
 						new AirBagEvent(AirBagEvent.COLLISION, false, false, collisions)
 					);
 				}
-
+				
 			} else {
 				_skipCounter++;
 			}
@@ -566,7 +566,7 @@ package cc.cote.airbag
 			greenRange:uint = 20, 
 			blueRange:uint = 20
 		):void {
-
+			
 			var numColors:int = colorExclusionArray.length;
 			for (var i:uint = 0; i < numColors; i++) {
 				if (colorExclusionArray[i].color == color) return; // fail silently
@@ -641,6 +641,121 @@ package cc.cote.airbag
 		
 		
 		
+		/** @private */
+		protected function _quicklyFindCollisions(item1:DisplayObject, item2:DisplayObject):void {
+			
+			// Plot the registration point of both items in the global coordinate space (from their 
+			// local coordinates). The localToGlobal() method takes into account any transformations 
+			// that have been applied to parents so we don't need to worry about that.
+			item1GlobalRegistrationPoint = item1.localToGlobal(new Point());
+			item2GlobalRegistrationPoint = item2.localToGlobal(new Point());
+			
+			// Retrieve the transformation matrices (we will modify them belw)
+			transMatrix1 = item1.transform.matrix;
+			transMatrix2 = item2.transform.matrix;
+			
+			// Combine matrices of item1 and those of all its parents into a single one that can be
+			// used at the global level. At the same time, grab the bounding box rectangle (in the
+			// coordinate space of its top-level parent)
+			var currentObj:DisplayObject = item1;
+			while (currentObj.parent != null) {
+				transMatrix1.concat(currentObj.parent.transform.matrix);
+				currentObj = currentObj.parent;
+			}
+			
+			item1BoundingBox = item1.getBounds(currentObj);
+			if (item1 != currentObj) {
+				item1BoundingBox.x += currentObj.x;
+				item1BoundingBox.y += currentObj.y;
+			}
+			
+			// Combine matrices of item1 and those of all its parents into a single one that can be
+			// used at the global level. At the same time, grab the bounding box rectangle (in the
+			// coordinate space of its top-level parent)
+			currentObj = item2;
+			while(currentObj.parent != null) {
+				transMatrix2.concat(currentObj.parent.transform.matrix);
+				currentObj = currentObj.parent;
+			}
+			
+			item2BoundingBox = item2.getBounds(currentObj);
+			if (item2 != currentObj) {
+				item2BoundingBox.x += currentObj.x;
+				item2BoundingBox.y += currentObj.y;
+			}
+			
+			// Calculate the translation that needs to be applied to the global matrix of each 
+			// object to match where the object is actually located in the global coordinate space
+			transMatrix1.tx = (item1GlobalRegistrationPoint.x - item1BoundingBox.x);
+			transMatrix1.ty = (item1GlobalRegistrationPoint.y - item1BoundingBox.y);
+			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item2BoundingBox.x);
+			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item2BoundingBox.y);
+			
+			// Create transparent BitmapDatas for both items. We will use them for detection
+			bmd1 = new BitmapData(item1BoundingBox.width, item1BoundingBox.height, true, 0);  
+			bmd2 = new BitmapData(item2BoundingBox.width, item2BoundingBox.height, true, 0);
+			
+			// Draw the items in their respective BitmapData objects while applying the 
+			// transformation matrices and color transformations
+			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
+			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
+			
+			
+			
+			// !!!!!!!!!! For maximum performance, we should only draw inside the rectangle that is formed by 
+			// the intersection of the bounding boxes
+			//var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
+			
+			
+			if(
+				bmd1.hitTest(
+					new Point(item1BoundingBox.x, item1BoundingBox.y), _alphaThreshold,
+					bmd2, 
+					new Point(item2BoundingBox.x, item2BoundingBox.y), _alphaThreshold
+				)
+			) {
+				
+				// If requested, calculate angle of the collision
+				var angle:Number = calculateAngles ? _findAngle(item1, item2) : NaN;
+				
+				// If a singleTarget has been defined, put it first for convenience
+				var output:Vector.<DisplayObject> = new <DisplayObject>[item1, item2];
+				if (item2 == singleTarget) output.reverse();
+				
+				
+				// Push items into collision array
+				var recordedCollision:Collision = new Collision(output, angle);
+				objectCollisionArray.push(recordedCollision);
+				// !!!!!!!! we should be returning what we find !!!
+			}
+			
+			// Properly free memory used be the BitmapDatas
+			bmd1.dispose();
+			bmd2.dispose();
+			
+		}
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		/** @private */
@@ -662,8 +777,8 @@ package cc.cote.airbag
 				item1IsUsingAdvancedAntiAliasing = true;
 				(item1 as TextField).antiAliasType = AntiAliasType.NORMAL;
 				
-//				item1IsUsingAdvancedAntiAliasing = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? true : false;
-//				(item1 as TextField).antiAliasType = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? AntiAliasType.NORMAL : (item1 as TextField).antiAliasType;
+				//				item1IsUsingAdvancedAntiAliasing = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? true : false;
+				//				(item1 as TextField).antiAliasType = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? AntiAliasType.NORMAL : (item1 as TextField).antiAliasType;
 			}
 			
 			if (item2 is TextField && (item2 as TextField).antiAliasType == AntiAliasType.ADVANCED) {
@@ -671,19 +786,19 @@ package cc.cote.airbag
 				(item2 as TextField).antiAliasType = AntiAliasType.NORMAL;
 			}
 			
-//			if(item2 is TextField) {
-//				item2IsUsingAdvancedAntiAliasing = ((item2 as TextField).antiAliasType == "advanced") ? true : false;
-//				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
-//			}
+			//			if(item2 is TextField) {
+			//				item2IsUsingAdvancedAntiAliasing = ((item2 as TextField).antiAliasType == "advanced") ? true : false;
+			//				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
+			//			}
 			
 			colorTransform1 = item1.transform.colorTransform;
 			colorTransform2 = item2.transform.colorTransform;
 			
 			// We store 0,0 of the item in global coordinates
-			item1Registration = new Point();
-			item2Registration = new Point();
-			item1Registration = item1.localToGlobal(item1Registration);
-			item2Registration = item2.localToGlobal(item2Registration);
+			item1GlobalRegistrationPoint = new Point();
+			item2GlobalRegistrationPoint = new Point();
+			item1GlobalRegistrationPoint = item1.localToGlobal(item1GlobalRegistrationPoint);
+			item2GlobalRegistrationPoint = item2.localToGlobal(item2GlobalRegistrationPoint);
 			
 			// We create transparent BitmapDatas for both items
 			bmd1 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);  
@@ -700,16 +815,16 @@ package cc.cote.airbag
 			}
 			
 			// Get bounds of item1 (accounting for parent movement if any)
-			rect1 = item1.getBounds(currentObj);
+			item1BoundingBox = item1.getBounds(currentObj);
 			if (item1 != currentObj) {
-				rect1.x += currentObj.x;
-				rect1.y += currentObj.y;
+				item1BoundingBox.x += currentObj.x;
+				item1BoundingBox.y += currentObj.y;
 			}
 			
 			// We take the global registration point and calculate a global translation point for the 
 			// matrix
-			transMatrix1.tx = item1xDiff = (item1Registration.x - rect1.left);
-			transMatrix1.ty = item1yDiff = (item1Registration.y - rect1.top);
+			transMatrix1.tx = item1xDiff = (item1GlobalRegistrationPoint.x - item1BoundingBox.left);
+			transMatrix1.ty = item1yDiff = (item1GlobalRegistrationPoint.y - item1BoundingBox.top);
 			
 			// we recuperate the transform matrix for object 2
 			transMatrix2 = item2.transform.matrix;
@@ -721,8 +836,8 @@ package cc.cote.airbag
 				currentObj = currentObj.parent;
 			}
 			
-			transMatrix2.tx = (item2Registration.x - rect1.left);
-			transMatrix2.ty = (item2Registration.y - rect1.top);
+			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item1BoundingBox.left);
+			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item1BoundingBox.top);
 			
 			// We finally draw
 			bmd1.draw(item1, transMatrix1, colorTransform1, null, null, true);
@@ -760,9 +875,12 @@ package cc.cote.airbag
 					break;
 				}
 				
-				var alpha1:uint = value1 >> 24 & 0xFF, alpha2:uint = value2 >> 24 & 0xFF;
+				var alpha1:uint = value1 >> 24 & 0xFF;
+				var alpha2:uint = value2 >> 24 & 0xFF;
 				
-				if(alpha1 > _alphaThreshold && alpha2 > _alphaThreshold)
+				
+				// Check if the alpha value of the pixel is higher than the threshold (more opaque)
+				if(alpha1 >= _alphaThreshold && alpha2 >= _alphaThreshold)
 				{	
 					var colorFlag:Boolean = false;
 					if(hasColors)
@@ -860,7 +978,7 @@ package cc.cote.airbag
 			if(item2IsUsingAdvancedAntiAliasing) (item2 as TextField).antiAliasType = "advanced";
 			
 			item1IsUsingAdvancedAntiAliasing = item2IsUsingAdvancedAntiAliasing = false;
-
+			
 		}
 		
 		/** @private */
@@ -1022,7 +1140,7 @@ package cc.cote.airbag
 			}
 			
 		}
-
+		
 		/** The detection mode currently in use. The value is <code>MANY_TO_MANY</code> when no 
 		 * <code>singleTarget</code> has been defined and ONE_TO_MANY otherwise.
 		 */
@@ -1032,25 +1150,26 @@ package cc.cote.airbag
 		
 		/**
 		 * The alpha threshold below which a collision will not be triggered. This property expects 
-		 * a value between 0 and 1 inclusively.
+		 * a value between 0 and 1 inclusively. A value of 0.25 means that pixels that are less than
+		 * 25% opaque will not trigger a collision.
 		 * 
-		 * @default 0
+		 * @default 1/255 ≈ 0.004
 		 */
 		public function get alphaThreshold():Number {
-			return _alphaThreshold;
+			return _alphaThreshold / 255;
 		}
 		
 		/** @private */
 		public function set alphaThreshold(theAlpha:Number):void {
 			if ((theAlpha <= 1) && (theAlpha >= 0)) {
-				_alphaThreshold = theAlpha * 255;
+				_alphaThreshold = Math.round(theAlpha * 255);
 			} else {
 				throw new RangeError(
 					"The alphaThreshold property expects a value between 0 and 1 inclusively."
 				);
 			}
 		}
-
+		
 		/**
 		 * <code>Boolean</code> indicating if angles should be calculated and included in the 
 		 * <code>Collision</code> objects. Leaving it <code>false</code> will improve performance.
@@ -1060,12 +1179,12 @@ package cc.cote.airbag
 		public function get calculateAngles():Boolean {
 			return _calculateAngles;
 		}
-
+		
 		/** @private */
 		public function set calculateAngles(value:Boolean):void {
 			_calculateAngles = value;
 		}
-
+		
 		/**
 		 * <code>Boolean</code> indicating if the vector of overlapping points should be calculated 
 		 * and returned in the <code>Collision</code> objects. Leaving it false will improve 
@@ -1076,12 +1195,12 @@ package cc.cote.airbag
 		public function get calculateOverlap():Boolean {
 			return _calculateOverlap;
 		}
-
+		
 		/** @private */
 		public function set calculateOverlap(value:Boolean):void {
 			_calculateOverlap = value;
 		}
-
+		
 		/**
 		 * <code>Boolean</code> indicating if parentless objects (those who are not on the display 
 		 * list) should be ignored by the detection process. When set to <code>true</code>, objects 
@@ -1092,12 +1211,12 @@ package cc.cote.airbag
 		public function get ignoreParentless():Boolean {
 			return _ignoreParentless;
 		}
-
+		
 		/** @private */
 		public function set ignoreParentless(value:Boolean):void {
 			_ignoreParentless = value;
 		}
-
+		
 		/**
 		 * <code>Boolean</code> indicating if objects whose <code>visible</code> property are 
 		 * <code>false</code> should be ignored by the detection process. 
@@ -1107,12 +1226,12 @@ package cc.cote.airbag
 		public function get ignoreInvisibles():Boolean {
 			return _ignoreInvisibles;
 		}
-
+		
 		/** @private */
 		public function set ignoreInvisibles(value:Boolean):void {
 			_ignoreInvisibles = value;
 		}
-
+		
 		/** 
 		 * The number of frames to skip when performing detection. By default, <code>AirBag</code>
 		 * performs collision detection for each <code>ENTER_FRAME</code> event. This can be changed 
@@ -1128,7 +1247,7 @@ package cc.cote.airbag
 		public function get skip():uint {
 			return _skip;
 		}
-
+		
 		/**
 		 * @private
 		 */
@@ -1136,8 +1255,8 @@ package cc.cote.airbag
 			_skipCounter = 0;
 			_skip = value;
 		}
-
-
+		
+		
 	}
 	
 }

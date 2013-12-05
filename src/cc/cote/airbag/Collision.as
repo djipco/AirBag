@@ -37,7 +37,7 @@ package cc.cote.airbag
 			_objects = objects;
 			_angle = angle;
 			
-			if (overlapping.length > 0) {
+			if (overlapping && overlapping.length > 0) {
 				_overlapping = overlapping;
 			} else {
 				_overlapping = null
