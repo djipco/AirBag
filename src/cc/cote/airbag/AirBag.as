@@ -24,11 +24,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package cc.cote.airbag
 {
-	import flash.display.Bitmap;
 	import flash.display.BitmapData;
 	import flash.display.DisplayObject;
 	import flash.display.Shape;
-	import flash.display.Sprite;
 	import flash.errors.EOFError;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
