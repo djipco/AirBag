@@ -2,6 +2,17 @@
 Release notes
 
 ********************************************************************************
+1.0a rev2
+
+	- The alphaThreshold now defaults to 1/255 (≈ 0.004). This means anything
+	  but completely transparent will trigger a collision.
+	  
+	- The alphaThreshold getter now reports the proper value.
+	
+	- Performance has been improved (at least 2x) when both calculateAngles and 
+	  calculateOverlap are false (which is the default behaviour).
+
+********************************************************************************
 1.0a rev1
 
 	- AirBag now extends the EventDispatcher class. It is now therefore possible 

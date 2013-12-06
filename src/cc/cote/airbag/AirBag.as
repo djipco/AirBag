@@ -24,9 +24,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 package cc.cote.airbag
 {
+	import flash.display.Bitmap;
 	import flash.display.BitmapData;
 	import flash.display.DisplayObject;
 	import flash.display.Shape;
+	import flash.display.Sprite;
 	import flash.errors.EOFError;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -150,9 +152,10 @@ package cc.cote.airbag
 	 * @see http://cote.cc/projects/airbag Official AirBag project page
 	 */
 	public class AirBag extends EventDispatcher
+//	public class AirBag extends Sprite
 	{
 		/** Current version of the library. */
-		public static const VERSION:String = '1.0a rev1';
+		public static const VERSION:String = '1.0a rev2';
 		
 		/** Constant defining a ONE_TO_MANY detection mode. */
 		public static const ONE_TO_MANY:String = 'oneToMany';
@@ -280,7 +283,7 @@ package cc.cote.airbag
 			
 			for each (var object:* in objects) {
 				
-				if (object is Vector.<DisplayObject>) {					// Vector.<DisplayObject>
+				if (object is Vector.<DisplayObject>) {				// Vector.<DisplayObject>
 					objectArray = objectArray.concat(object);
 				} else if (object is DisplayObject) {				// DisplayObject
 					objectArray.push(object);
@@ -412,7 +415,7 @@ package cc.cote.airbag
 				
 				if (item1.hitTestObject(item2)) {
 					
-					// THIS IS SUPER FUCKING IMPORTANT FOR PERFORMANCE !!!!!!!!!
+//					// THIS IS SUPER FUCKING IMPORTANT FOR PERFORMANCE !!!!!!!!!
 					if((item2.width * item2.height) > (item1.width * item1.height)) {
 						objectCheckArray.push(new <DisplayObject>[item1,item2])
 					} else {
@@ -424,13 +427,20 @@ package cc.cote.airbag
 			}
 			
 			NUM_OBJS = objectCheckArray.length;
+			var c:Collision = null;
 			for(i = 0; i < NUM_OBJS; i++) {
-				_findCollisions(
-					objectCheckArray[i][0], 
-					objectCheckArray[i][1], 
-					calculateAngles, 
-					calculateOverlap
-				);
+				
+				if (calculateAngles || calculateOverlap) {
+					c = _findCollisionWithDetails(
+						objectCheckArray[i][0], objectCheckArray[i][1], 
+						calculateAngles, calculateOverlap
+					);
+				} else {
+					c = _findCollision(objectCheckArray[i][0], objectCheckArray[i][1]);
+				}
+				
+				c && objectCollisionArray.push(c);
+				
 			}
 			
 			return objectCollisionArray;
@@ -456,8 +466,7 @@ package cc.cote.airbag
 					if (ignoreParentless && !item2.parent) break;
 					if (ignoreInvisibles && !item2.visible) break;
 					
-					if(item1.hitTestObject(item2))
-					{
+					if(item1.hitTestObject(item2)) {
 						
 						// THIS IS SUPER FUCKING IMPORTANT !!!!!!!!!
 						if((item2.width * item2.height) > (item1.width * item1.height)) {
@@ -471,14 +480,19 @@ package cc.cote.airbag
 			}
 			
 			NUM_OBJS = objectCheckArray.length;
+			var c:Collision = null;
 			for(i = 0; i < NUM_OBJS; i++) {
-				_findCollisions(
-					objectCheckArray[i][0], 
-					objectCheckArray[i][1], 
-					calculateAngles, 
-					calculateOverlap
-				);
-//				_quicklyFindCollisions(objectCheckArray[i][0], objectCheckArray[i][1]);
+				
+				if (calculateAngles || calculateOverlap) {
+					c = _findCollisionWithDetails(
+						objectCheckArray[i][0], objectCheckArray[i][1], 
+						calculateAngles, calculateOverlap
+					);
+				} else {
+					c = _findCollision(objectCheckArray[i][0], objectCheckArray[i][1]);
+				}
+				
+				c && objectCollisionArray.push(c);
 			}
 			
 			return objectCollisionArray;
@@ -631,18 +645,8 @@ package cc.cote.airbag
 			}
 		}
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
 		/** @private */
-		protected function _quicklyFindCollisions(item1:DisplayObject, item2:DisplayObject):void {
+		protected function _findCollision(item1:DisplayObject, item2:DisplayObject):Collision {
 			
 			// Plot the registration point of both items in the global coordinate space (from their 
 			// local coordinates). The localToGlobal() method takes into account any transformations 
@@ -691,22 +695,58 @@ package cc.cote.airbag
 			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item2BoundingBox.x);
 			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item2BoundingBox.y);
 			
-			// Create transparent BitmapDatas for both items. We will use them for detection
+			
+			
+			
+			
+			
+			
+			
+
+			// HOW THE FUCK CAN WE DO THIS ?!!!!!?!?!?!
+			
+			// Fetch the rectangle that represents the intersection of the items bounding boxes.
+			// This is the only zone that needs to be drawn. The intersection() method may return 
+			// rectangles with a dimension (width or height) that is smaller than a pixel. So, we 
+			// need to make sure those are accouted for [using Math.ceil()]. This performs rounding 
+			// by the same token
+//			var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
+//			if (intersect.isEmpty()) return null; // THIS IS WEIRD !!!
+//			intersect.width = Math.ceil(intersect.width);
+//			intersect.height = Math.ceil(intersect.height);
+//			
+//			transMatrix1.tx = (item1GlobalRegistrationPoint.x - intersect.x);
+//			transMatrix1.ty = (item1GlobalRegistrationPoint.y - intersect.y);
+//			transMatrix2.tx = (item2GlobalRegistrationPoint.x - intersect.x);
+//			transMatrix2.ty = (item2GlobalRegistrationPoint.y - intersect.y);
+//			
+//			bmd1 = new BitmapData(intersect.width, intersect.height, false, 0x00FF0000);  
+//			bmd2 = new BitmapData(intersect.width, intersect.height, false, 0x0000FF00);
+//			
+//			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
+//			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
+//
+//			addChild(new Bitmap(bmd1));
+//			addChild(new Bitmap(bmd2));
+			
+			
+			
+			
+			
+			
+			
+			
+			// Create transparent BitmapDatas for both items. We use the smallest since the
 			bmd1 = new BitmapData(item1BoundingBox.width, item1BoundingBox.height, true, 0);  
 			bmd2 = new BitmapData(item2BoundingBox.width, item2BoundingBox.height, true, 0);
 			
 			// Draw the items in their respective BitmapData objects while applying the 
 			// transformation matrices and color transformations
-			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
-			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
+			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, false);
+			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, false);
 			
-			
-			
-			// !!!!!!!!!! For maximum performance, we should only draw inside the rectangle that is formed by 
-			// the intersection of the bounding boxes
-			//var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
-			
-			
+			// Check if we have a pixel-level hit taking into account the minimum alpha threshold
+			var recordedCollision:Collision = null;
 			if(
 				bmd1.hitTest(
 					new Point(item1BoundingBox.x, item1BoundingBox.y), _alphaThreshold,
@@ -715,56 +755,30 @@ package cc.cote.airbag
 				)
 			) {
 				
-				// If requested, calculate angle of the collision
-				var angle:Number = calculateAngles ? _findAngle(item1, item2) : NaN;
-				
 				// If a singleTarget has been defined, put it first for convenience
 				var output:Vector.<DisplayObject> = new <DisplayObject>[item1, item2];
 				if (item2 == singleTarget) output.reverse();
 				
-				
 				// Push items into collision array
-				var recordedCollision:Collision = new Collision(output, angle);
-				objectCollisionArray.push(recordedCollision);
-				// !!!!!!!! we should be returning what we find !!!
+				recordedCollision = new Collision(output);
 			}
 			
 			// Properly free memory used be the BitmapDatas
 			bmd1.dispose();
 			bmd2.dispose();
 			
+			// Return collision (if found) or null otherwise
+			return recordedCollision;
+			
 		}
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
 		/** @private */
-		protected function _findCollisions(
+		protected function _findCollisionWithDetails(
 			item1:DisplayObject, 
 			item2:DisplayObject, 
 			calculateAngles:Boolean = false,
 			includeOverlapData:Boolean = false
-		):void {
+		):Collision {
 			
 			var item1IsUsingAdvancedAntiAliasing:Boolean = false;
 			var item2IsUsingAdvancedAntiAliasing:Boolean = false;
@@ -962,6 +976,8 @@ package cc.cote.airbag
 			pixels1.clear();
 			pixels2.clear();
 			
+			var recordedCollision:Collision = null;
+			
 			if (overlap) {
 				var angle:Number = calculateAngles ? _findAngle(item1, item2) : NaN;
 				
@@ -969,7 +985,7 @@ package cc.cote.airbag
 				var output:Vector.<DisplayObject> = new <DisplayObject>[item1, item2];
 				if (item2 == singleTarget) output.reverse();
 				
-				var recordedCollision:Collision = new Collision(output, angle, overlapping);
+				recordedCollision = new Collision(output, angle, overlapping);
 				objectCollisionArray.push(recordedCollision);
 			}
 			
@@ -978,6 +994,8 @@ package cc.cote.airbag
 			if(item2IsUsingAdvancedAntiAliasing) (item2 as TextField).antiAliasType = "advanced";
 			
 			item1IsUsingAdvancedAntiAliasing = item2IsUsingAdvancedAntiAliasing = false;
+			
+			return recordedCollision;
 			
 		}
 		
@@ -1150,8 +1168,8 @@ package cc.cote.airbag
 		
 		/**
 		 * The alpha threshold below which a collision will not be triggered. This property expects 
-		 * a value between 0 and 1 inclusively. A value of 0.25 means that pixels that are less than
-		 * 25% opaque will not trigger a collision.
+		 * a value between 0 and 1 inclusively. For example, a value of 0.25 means that pixels that 
+		 * are less than 25% opaque will not trigger a collision.
 		 * 
 		 * @default 1/255 ≈ 0.004
 		 */
