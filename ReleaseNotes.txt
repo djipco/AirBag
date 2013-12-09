@@ -2,7 +2,7 @@
 Release notes
 
 ********************************************************************************
-1.0a rev2
+1.0a rev3
 
 	- Another gain in performance was achieved by only comparing the data inside
 	  the intersection of the objects.
