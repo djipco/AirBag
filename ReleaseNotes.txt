@@ -4,6 +4,18 @@ Release notes
 ********************************************************************************
 1.0a rev2
 
+	- Another gain in performance was achieved by only comparing the data inside
+	  the intersection of the objects.
+
+	- The findCollisions() method has been renamed to simply detect().
+	
+	- There is now a 'debug' mode which draws outlines inside the 'outlines'
+	  property (Sprite). This sprite can be put on stage to help visualize the
+	  detection process.
+
+********************************************************************************
+1.0a rev2
+
 	- The alphaThreshold now defaults to 1/255 (≈ 0.004). This means anything
 	  but completely transparent will trigger a collision.
 	  

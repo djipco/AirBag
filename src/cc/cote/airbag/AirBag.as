@@ -29,6 +29,7 @@ package cc.cote.airbag
 	import flash.display.Shape;
 	import flash.display.Sprite;
 	import flash.errors.EOFError;
+	import flash.errors.IllegalOperationError;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.geom.ColorTransform;
@@ -65,12 +66,6 @@ package cc.cote.airbag
 	 * <code>Bitmap</code>s, <code>TextField</code>s, <code>Video</code>s, etc.). It also 
 	 * facilitates the exclusion of certain color ranges from detection and takes into account the
 	 * desired alpha threshold.
-	 * 
-	 * <p>Most of the core collision detection code comes from 
-	 * <a href="http://coreyoneil.com/">Corey O'Neil</a>'s excellent 
-	 * <a href="http://code.google.com/p/collisiondetectionkit/">Collision Detection Kit</a>. By 
-	 * releasing <code>AirBag</code>, we hope to overcome some limitations and repair some API 
-	 * quirks found in the original CDK.</p>
 	 * 
 	 * To perform collision detection, you must first specify a list of objects upon which the 
 	 * detection will take place. The way do do that is to pass a list of 
@@ -151,7 +146,6 @@ package cc.cote.airbag
 	 * @see http://cote.cc/projects/airbag Official AirBag project page
 	 */
 	public class AirBag extends EventDispatcher
-//	public class AirBag extends Sprite
 	{
 		/** Current version of the library. */
 		public static const VERSION:String = '1.0a rev3';
@@ -170,7 +164,6 @@ package cc.cote.airbag
 		protected var _ignoreParentless:Boolean = true;
 		/** @private */
 		protected var _ignoreInvisibles:Boolean = true;
-		
 		/** @private */
 		protected var _alphaThreshold:uint;
 		/** @private **/
@@ -182,9 +175,9 @@ package cc.cote.airbag
 		protected var objectCheckArray:Vector.<Vector.<DisplayObject>>;
 		/** @private */
 		protected var objectCollisionArray:Vector.<Collision>;
+		
 		/** @private */
 		protected var colorExclusionArray:Array;
-		
 		/** @private */
 		protected var bmd1:BitmapData;
 		/** @private */
@@ -214,17 +207,18 @@ package cc.cote.airbag
 		
 		/** @private */
 		protected var _enterFrameCatcher:Shape;
+		/** @private */
+		private var _emptyPoint:Point = new Point();
 		
 		/** @private */
 		protected var _skip:uint;
-		
 		/** @private */
 		protected var _skipCounter:uint;
 		
-		protected var _debugging:Boolean;
-
 		/** @private */
-		protected var _debugOutlines:Sprite;
+		protected var _debug:Boolean = false;
+		/** @private */
+		protected var _outlines:Sprite;
 		
 		/**
 		 * Creates an <code>AirBag</code> object from the <code>DisplayObject</code>s passed as 
@@ -264,8 +258,6 @@ package cc.cote.airbag
 			_alphaThreshold = 1;
 			_skip = 0;
 			_skipCounter = 0;
-			
-			_debugging = false;
 			
 			for each (var obj:* in objects) add(obj);
 			
@@ -388,7 +380,7 @@ package cc.cote.airbag
 			objectCheckArray = new <Vector.<DisplayObject>>[];
 			objectCollisionArray = new <Collision>[];
 			
-			if (debugging) _drawDebuggingOutlines();
+			if (debug) _drawDebuggingOutlines();
 			
 			if (_mode == ONE_TO_MANY) {
 				return _checkOneToManyCollisions();
@@ -542,8 +534,6 @@ package cc.cote.airbag
 				
 				_skipCounter = 1;
 				
-				
-				
 				var collisions:Vector.<Collision> = detect();
 				
 				dispatchEvent(
@@ -664,13 +654,13 @@ package cc.cote.airbag
 			item1GlobalRegistrationPoint = item1.localToGlobal(new Point());
 			item2GlobalRegistrationPoint = item2.localToGlobal(new Point());
 			
-			// Retrieve the transformation matrices (we will modify them belw)
+			// Retrieve the transformation matrices (we will modify them below)
 			transMatrix1 = item1.transform.matrix;
 			transMatrix2 = item2.transform.matrix;
 			
 			// Combine matrices of item1 and those of all its parents into a single one that can be
 			// used at the global level. At the same time, grab the bounding box rectangle (in the
-			// coordinate space of its top-level parent)
+			// coordinate space of its top-level parent).
 			var currentObj:DisplayObject = item1;
 			while (currentObj.parent != null) {
 				transMatrix1.concat(currentObj.parent.transform.matrix);
@@ -683,9 +673,9 @@ package cc.cote.airbag
 				item1BoundingBox.y += currentObj.y;
 			}
 			
-			// Combine matrices of item1 and those of all its parents into a single one that can be
+			// Combine matrices of item2 and those of all its parents into a single one that can be
 			// used at the global level. At the same time, grab the bounding box rectangle (in the
-			// coordinate space of its top-level parent)
+			// coordinate space of its top-level parent).
 			currentObj = item2;
 			while(currentObj.parent != null) {
 				transMatrix2.concat(currentObj.parent.transform.matrix);
@@ -698,74 +688,36 @@ package cc.cote.airbag
 				item2BoundingBox.y += currentObj.y;
 			}
 			
-			// Calculate the translation that needs to be applied to the global matrix of each 
-			// object to match where the object is actually located in the global coordinate space
-			transMatrix1.tx = (item1GlobalRegistrationPoint.x - item1BoundingBox.x);
-			transMatrix1.ty = (item1GlobalRegistrationPoint.y - item1BoundingBox.y);
-			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item2BoundingBox.x);
-			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item2BoundingBox.y);
-			
-			
-			
-			
-			
-			
-			
-			
-
-			// HOW THE FUCK CAN WE DO THIS ?!!!!!?!?!?!
-			
-			// Fetch the rectangle that represents the intersection of the items bounding boxes.
+			// Fetch the rectangle that represents the intersection of the items' bounding boxes.
 			// This is the only zone that needs to be drawn. The intersection() method may return 
 			// rectangles with a dimension (width or height) that is smaller than a pixel. So, we 
-			// need to make sure those are accouted for [using Math.ceil()]. This performs rounding 
-			// by the same token
+			// need to make sure those are accounted for [using Math.ceil()]. This also performs the 
+			// necessary rounding (before drawing) by the same token.
 			var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
 			if (intersect.isEmpty()) return null; // THIS IS WEIRD !!!
-			if (_debugging) _drawDebuggingIntersect(intersect);
 			intersect.width = Math.ceil(intersect.width);
 			intersect.height = Math.ceil(intersect.height);
+
+			// If we are in debugging mode, draw the intersection zone
+			if (_debug) _drawDebuggingIntersect(intersect);
 			
-//			
-//			transMatrix1.tx = (item1GlobalRegistrationPoint.x - intersect.x);
-//			transMatrix1.ty = (item1GlobalRegistrationPoint.y - intersect.y);
-//			transMatrix2.tx = (item2GlobalRegistrationPoint.x - intersect.x);
-//			transMatrix2.ty = (item2GlobalRegistrationPoint.y - intersect.y);
-//			
-//			bmd1 = new BitmapData(intersect.width, intersect.height, false, 0x00FF0000);  
-//			bmd2 = new BitmapData(intersect.width, intersect.height, false, 0x0000FF00);
-//			
-//			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
-//			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
-//
-//			addChild(new Bitmap(bmd1));
-//			addChild(new Bitmap(bmd2));
+			// Calculate the offset between the intersection zone's registration points and the 
+			// objects' registration points so we draw them at the right place.
+			transMatrix1.tx = (item1GlobalRegistrationPoint.x - intersect.x);
+			transMatrix1.ty = (item1GlobalRegistrationPoint.y - intersect.y);
+			transMatrix2.tx = (item2GlobalRegistrationPoint.x - intersect.x);
+			transMatrix2.ty = (item2GlobalRegistrationPoint.y - intersect.y);
 			
-			
-			
-			
-			
-			
-			
-			
-			// Create transparent BitmapDatas for both items. We use the smallest since the
-			bmd1 = new BitmapData(item1BoundingBox.width, item1BoundingBox.height, true, 0);  
-			bmd2 = new BitmapData(item2BoundingBox.width, item2BoundingBox.height, true, 0);
-			
-			// Draw the items in their respective BitmapData objects while applying the 
-			// transformation matrices and color transformations
-			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, false);
-			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, false);
-			
-			// Check if we have a pixel-level hit taking into account the minimum alpha threshold
+			// Create two transparent BitmapDatas the size of the intersection zone and draw only
+			// what is that zone for each item.
+			bmd1 = new BitmapData(intersect.width, intersect.height, true, 0);  
+			bmd2 = new BitmapData(intersect.width, intersect.height, true, 0);
+			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
+			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
+
+			// Perform the actual collision detection
 			var recordedCollision:Collision = null;
-			if(
-				bmd1.hitTest(
-					new Point(item1BoundingBox.x, item1BoundingBox.y), _alphaThreshold,
-					bmd2, 
-					new Point(item2BoundingBox.x, item2BoundingBox.y), _alphaThreshold
-				)
-			) {
+			if( bmd1.hitTest(_emptyPoint, _alphaThreshold, bmd2, _emptyPoint, _alphaThreshold) ) {
 				
 				// If a singleTarget has been defined, put it first for convenience
 				var output:Vector.<DisplayObject> = new <DisplayObject>[item1, item2];
@@ -784,10 +736,11 @@ package cc.cote.airbag
 			
 		}
 		
+		/** @private */
 		protected function _drawDebuggingIntersect(box:Rectangle):void {
-			_debugOutlines.graphics.beginFill(0x00FF00, .5)
-			_debugOutlines.graphics.moveTo(box.x, box.y);
-			_debugOutlines.graphics.drawRect(box.x, box.y, box.width, box.height);
+			_outlines.graphics.beginFill(0x00FF00, .5)
+			_outlines.graphics.moveTo(box.x, box.y);
+			_outlines.graphics.drawRect(box.x, box.y, box.width, box.height);
 		}
 		
 		/** @private */
@@ -875,7 +828,7 @@ package cc.cote.airbag
 			
 			
 			// Draw outlines for debugging purposes (if requested)
-			if (_debugging) {
+			if (_debug) {
 				var intersect:Rectangle = item1BoundingBox.intersection(item2.getBounds(currentObj));
 				if (!intersect.isEmpty()) {
 					intersect.width = Math.ceil(intersect.width);
@@ -1034,19 +987,20 @@ package cc.cote.airbag
 			
 		}
 		
+		/** @private */
 		protected function _drawDebuggingOutlines():void {
 			
-			var targetSpace:DisplayObject = _debugOutlines.parent;
+			var targetSpace:DisplayObject = _outlines.parent;
 			if (!targetSpace) return;
 			
-			_debugOutlines.graphics.clear();
+			_outlines.graphics.clear();
 			
 			var box:Rectangle;
 			for each (var obj:DisplayObject in objectArray) {
 				box = obj.getBounds(targetSpace);
-				_debugOutlines.graphics.lineStyle(1, 0x555555, .75);
-				_debugOutlines.graphics.moveTo(box.x, box.y);
-				_debugOutlines.graphics.drawRect(box.x, box.y, box.width, box.height);
+				_outlines.graphics.lineStyle(1, 0x555555, .75);
+				_outlines.graphics.moveTo(box.x, box.y);
+				_outlines.graphics.drawRect(box.x, box.y, box.width, box.height);
 			}
 			
 			
@@ -1215,17 +1169,21 @@ package cc.cote.airbag
 		
 		/** The detection mode currently in use. The value is <code>MANY_TO_MANY</code> when no 
 		 * <code>singleTarget</code> has been defined and ONE_TO_MANY otherwise.
+		 * 
+		 * @default MANY_TO_MANY
 		 */
 		public function get mode():String {
 			return _mode;
 		}
 		
 		/**
-		 * The alpha threshold below which a collision will not be triggered. This property expects 
-		 * a value between 0 and 1 inclusively. For example, a value of 0.25 means that pixels that 
-		 * are less than 25% opaque will not trigger a collision.
+		 * The alpha (opacity) threshold below which a collision will not be triggered. This 
+		 * property expects a value between 0 and 1 inclusively. For example, a value of 0.25 means 
+		 * that pixels that are less than 25% opaque will not trigger a collision.
 		 * 
 		 * @default 1/255 ≈ 0.004
+		 * @throws RangeError	The alphaThreshold property expects a value between 0 and 1 
+		 * 						inclusively.
 		 */
 		public function get alphaThreshold():Number {
 			return _alphaThreshold / 255;
@@ -1327,38 +1285,50 @@ package cc.cote.airbag
 		}
 	
 		/**
-		 * Boolean to enable or disable debugging mode. When true, <code>Airbag</code> draws 
-		 * visual debugging outlines inside the <code>debugOutlines</code> property. This property
-		 * is a <code>Sprite</code> that can be added to the stage to visualize the detetion 
-		 * process.
-		 * 
+		 * Enables/disables debug mode. When true, <code>Airbag</code> draws visual outlines inside 
+		 * the <code>outlines</code> property. The <code>outlines</code> property is a 
+		 * <code>Sprite</code> that can be added to the stage to visualize the detection process. 
+		 * This shouldn't be enabled in production.
+		 *  
 		 * @since 1.0a rev3
+		 * @default false
 		 */ 
-		public function get debugging():Boolean {
-			return _debugging;
+		public function get debug():Boolean {
+			return _debug;
 		}
 
 		/** @private */
-		public function set debugging(value:Boolean):void {
-			_debugging = value;
+		public function set debug(value:Boolean):void {
+			_debug = value;
 			
-			if (_debugging) {
-				_debugOutlines = new Sprite()
+			if (_debug) {
+				_outlines = new Sprite()
 			} else {
-				_debugOutlines = null;
+				_outlines = null;
 			}
 		}
 
 		/**
-		 * A <code>Sprite</code> inside which debugging shapes are drawn to help visualise the 
-		 * debugging process.
+		 * A <code>Sprite</code> inside which debugging shapes are drawn to help visualise how 
+		 * <code>AirBag</code> tracks items and detects collisions. To view the debugging shapes,
+		 * simply add this <code>Sprite</code> to the stage. This should not be used in production.
 		 * 
 		 * @since 1.0a rev3
+		 * @throws IllegalOperationError 	The 'debug' property must be 'true' to use the 
+		 * 									debugging outlines.
+		 * @default null
 		 */
-		public function get debugOutlines():Sprite {
-			return _debugOutlines;
+		public function get outlines():Sprite {
+			
+			if (_outlines) {
+				return _outlines;
+			} else {
+				throw new IllegalOperationError(
+					"The 'debug' property must be 'true' to use the outlines."
+				);
+			}
+			
 		}
-		
 		
 	}
 	
