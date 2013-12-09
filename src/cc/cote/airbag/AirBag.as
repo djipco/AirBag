@@ -27,6 +27,7 @@ package cc.cote.airbag
 	import flash.display.BitmapData;
 	import flash.display.DisplayObject;
 	import flash.display.Shape;
+	import flash.display.Sprite;
 	import flash.errors.EOFError;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -85,7 +86,7 @@ package cc.cote.airbag
 	 * 
 	 * <p>By default, collision detection works in a <b>many-to-many</b> relationship. That
 	 * is, all objects will be checked against all other objects when calling the 
-	 * <code>checkCollisions()</code> method.</p>
+	 * <code>detect()</code> method.</p>
 	 * 
 	 * <p>Alternatively, if a specific target has been assigned by way of the 
 	 * <code>singleTarget</code> property, detection will work in a <b>one-to-many</b> relationship. 
@@ -102,15 +103,15 @@ package cc.cote.airbag
 	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
 	 * airbag.add(obj4, obj5);</listing>
 	 * 
-	 * <p>Then, you call the <code>checkCollisions()</code> method whenever appropriate. For 
+	 * <p>Then, you call the <code>detect()</code> method whenever appropriate. For 
 	 * example, you can continually check for collisions by using an <code>ENTER_FRAME</code>
 	 * handler:</p>
 	 * 
 	 * <listing version="3.0">
-	 * addEventListener(Event.ENTER_FRAME, checkCollisions);
+	 * addEventListener(Event.ENTER_FRAME, detect);
 	 * 
-	 * public function checkCollisions(e:Event):void {
-	 * 	var collisions:Vector.&lt;Collision&gt; = airbag.checkCollisions();
+	 * public function detect(e:Event):void {
+	 * 	var collisions:Vector.&lt;Collision&gt; = airbag.detect();
 	 * 	if (collisions.length) {
 	 * 		trace("Collision detected!");
 	 * 	}
@@ -153,7 +154,7 @@ package cc.cote.airbag
 //	public class AirBag extends Sprite
 	{
 		/** Current version of the library. */
-		public static const VERSION:String = '1.0a rev2';
+		public static const VERSION:String = '1.0a rev3';
 		
 		/** Constant defining a ONE_TO_MANY detection mode. */
 		public static const ONE_TO_MANY:String = 'oneToMany';
@@ -220,6 +221,11 @@ package cc.cote.airbag
 		/** @private */
 		protected var _skipCounter:uint;
 		
+		protected var _debugging:Boolean;
+
+		/** @private */
+		protected var _debugOutlines:Sprite;
+		
 		/**
 		 * Creates an <code>AirBag</code> object from the <code>DisplayObject</code>s passed as 
 		 * parameters. The <code>DisplayObject</code>s to use can be specified by passing any of the 
@@ -258,6 +264,8 @@ package cc.cote.airbag
 			_alphaThreshold = 1;
 			_skip = 0;
 			_skipCounter = 0;
+			
+			_debugging = false;
 			
 			for each (var obj:* in objects) add(obj);
 			
@@ -373,11 +381,14 @@ package cc.cote.airbag
 		 * 						<code>ignoreInvisibles</code> is true.
 		 * 
 		 * @see cc.cote.airbag.Collision
+		 * @since 1.0a rev3 (previously called checkCollisions)
 		 */
-		public function checkCollisions():Vector.<Collision> {
+		public function detect():Vector.<Collision> {
 			
 			objectCheckArray = new <Vector.<DisplayObject>>[];
 			objectCollisionArray = new <Collision>[];
+			
+			if (debugging) _drawDebuggingOutlines();
 			
 			if (_mode == ONE_TO_MANY) {
 				return _checkOneToManyCollisions();
@@ -473,6 +484,7 @@ package cc.cote.airbag
 							objectCheckArray.push(new <DisplayObject>[item2,item1]);
 						}
 					}
+					
 				}
 				
 			}
@@ -532,7 +544,7 @@ package cc.cote.airbag
 				
 				
 				
-				var collisions:Vector.<Collision> = checkCollisions();
+				var collisions:Vector.<Collision> = detect();
 				
 				dispatchEvent(
 					new AirBagEvent(AirBagEvent.DETECTION, false, false, collisions)
@@ -708,10 +720,12 @@ package cc.cote.airbag
 			// rectangles with a dimension (width or height) that is smaller than a pixel. So, we 
 			// need to make sure those are accouted for [using Math.ceil()]. This performs rounding 
 			// by the same token
-//			var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
-//			if (intersect.isEmpty()) return null; // THIS IS WEIRD !!!
-//			intersect.width = Math.ceil(intersect.width);
-//			intersect.height = Math.ceil(intersect.height);
+			var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
+			if (intersect.isEmpty()) return null; // THIS IS WEIRD !!!
+			if (_debugging) _drawDebuggingIntersect(intersect);
+			intersect.width = Math.ceil(intersect.width);
+			intersect.height = Math.ceil(intersect.height);
+			
 //			
 //			transMatrix1.tx = (item1GlobalRegistrationPoint.x - intersect.x);
 //			transMatrix1.ty = (item1GlobalRegistrationPoint.y - intersect.y);
@@ -770,6 +784,12 @@ package cc.cote.airbag
 			
 		}
 		
+		protected function _drawDebuggingIntersect(box:Rectangle):void {
+			_debugOutlines.graphics.beginFill(0x00FF00, .5)
+			_debugOutlines.graphics.moveTo(box.x, box.y);
+			_debugOutlines.graphics.drawRect(box.x, box.y, box.width, box.height);
+		}
+		
 		/** @private */
 		protected function _findCollisionWithDetails(
 			item1:DisplayObject, 
@@ -812,6 +832,8 @@ package cc.cote.airbag
 			item1GlobalRegistrationPoint = item1.localToGlobal(item1GlobalRegistrationPoint);
 			item2GlobalRegistrationPoint = item2.localToGlobal(item2GlobalRegistrationPoint);
 			
+			
+			
 			// We create transparent BitmapDatas for both items
 			bmd1 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);  
 			bmd2 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);
@@ -850,6 +872,21 @@ package cc.cote.airbag
 			
 			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item1BoundingBox.left);
 			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item1BoundingBox.top);
+			
+			
+			// Draw outlines for debugging purposes (if requested)
+			if (_debugging) {
+				var intersect:Rectangle = item1BoundingBox.intersection(item2.getBounds(currentObj));
+				if (!intersect.isEmpty()) {
+					intersect.width = Math.ceil(intersect.width);
+					intersect.height = Math.ceil(intersect.height);
+					_drawDebuggingIntersect(intersect);
+				}
+			}
+			
+			
+			
+			
 			
 			// We finally draw
 			bmd1.draw(item1, transMatrix1, colorTransform1, null, null, true);
@@ -994,6 +1031,25 @@ package cc.cote.airbag
 			item1IsUsingAdvancedAntiAliasing = item2IsUsingAdvancedAntiAliasing = false;
 			
 			return recordedCollision;
+			
+		}
+		
+		protected function _drawDebuggingOutlines():void {
+			
+			var targetSpace:DisplayObject = _debugOutlines.parent;
+			if (!targetSpace) return;
+			
+			_debugOutlines.graphics.clear();
+			
+			var box:Rectangle;
+			for each (var obj:DisplayObject in objectArray) {
+				box = obj.getBounds(targetSpace);
+				_debugOutlines.graphics.lineStyle(1, 0x555555, .75);
+				_debugOutlines.graphics.moveTo(box.x, box.y);
+				_debugOutlines.graphics.drawRect(box.x, box.y, box.width, box.height);
+			}
+			
+			
 			
 		}
 		
@@ -1264,12 +1320,43 @@ package cc.cote.airbag
 			return _skip;
 		}
 		
-		/**
-		 * @private
-		 */
+		/** @private */
 		public function set skip(value:uint):void {
 			_skipCounter = 0;
 			_skip = value;
+		}
+	
+		/**
+		 * Boolean to enable or disable debugging mode. When true, <code>Airbag</code> draws 
+		 * visual debugging outlines inside the <code>debugOutlines</code> property. This property
+		 * is a <code>Sprite</code> that can be added to the stage to visualize the detetion 
+		 * process.
+		 * 
+		 * @since 1.0a rev3
+		 */ 
+		public function get debugging():Boolean {
+			return _debugging;
+		}
+
+		/** @private */
+		public function set debugging(value:Boolean):void {
+			_debugging = value;
+			
+			if (_debugging) {
+				_debugOutlines = new Sprite()
+			} else {
+				_debugOutlines = null;
+			}
+		}
+
+		/**
+		 * A <code>Sprite</code> inside which debugging shapes are drawn to help visualise the 
+		 * debugging process.
+		 * 
+		 * @since 1.0a rev3
+		 */
+		public function get debugOutlines():Sprite {
+			return _debugOutlines;
 		}
 		
 		

@@ -8,7 +8,7 @@ package cc.cote.airbag
 
 	/**
 	 * The <code>Collision</code> class contains information about a collision that occured between 
-	 * two <code>DisplayObject</code>s. The <code>AirBag.checkCollisions()</code> method returns a 
+	 * two <code>DisplayObject</code>s. The <code>AirBag.detect()</code> method returns a 
 	 * vector of such objects when performing collision detection.
 	 * @see cc.cote.airbag.AirBag
 	 */
