@@ -8,8 +8,9 @@ package cc.cote.airbag
 
 	/**
 	 * The <code>Collision</code> class contains information about a collision that occured between 
-	 * two <code>DisplayObject</code>s. The <code>AirBag.detect()</code> method returns a 
-	 * vector of such objects when performing collision detection.
+	 * two <code>DisplayObject</code>s. For instance, the <code>AirBag.detect()</code> method 
+	 * returns a vector of such objects when performing collision detection.
+	 * 
 	 * @see cc.cote.airbag.AirBag
 	 */
 	public class Collision
@@ -21,12 +22,12 @@ package cc.cote.airbag
 		
 		/**
 		 * Creates a <code>Collision</code> object. This object contains properties describing a
-		 * collision that was detected between two objects (typically by the 
-		 * <code>CollisionDetector</code> class).
+		 * collision that was detected between two objects (typically by the <code>AirBag</code> 
+		 * class).
 		 * 
-		 * @param objects 	A vector of the objects that collided. 
-		 * @param angle 	The angle of collision (in radians)
-		 * @param overlapping A vector of all overlapping points between the colliding objects
+		 * @param objects 		A vector of the objects that collided. 
+		 * @param angle 		The angle of collision (in radians)
+		 * @param overlapping 	A vector of all overlapping points between the colliding objects
 		 */
 		public function Collision(
 			objects:Vector.<DisplayObject>, 

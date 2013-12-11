@@ -41,7 +41,6 @@ package cc.cote.airbag
 	import flash.utils.ByteArray;
 	import flash.utils.getQualifiedClassName;
 	
-	
 	/**
 	 * Dispatched each time <code>AirBag</code> performs its detection routine. This typically is on
 	 * each <code>ENTER_FRAME</code> but can be altered by the <code>skip</code> property.
@@ -123,8 +122,8 @@ package cc.cote.airbag
 	 * <code>obj3</code> with <code>obj4</code> but won't report collisions of <code>obj1</code>, 
 	 * <code>obj2</code> and <code>obj3</code> with themselves.</p>
 	 * 
-	 * <p>Starting in version 1.0a rev1, you can listen to events directly on the <code>AirBag</code>
-	 * object.</p>
+	 * <p>Starting in version 1.0a rev1, you can listen to events directly on the 
+	 * <code>AirBag</code> object.</p>
 	 * 
 	 * <listing version="3.0">
 	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
@@ -156,69 +155,77 @@ package cc.cote.airbag
 		/** Constant defining a MANY_TO_MANY detection mode. */
 		public static const MANY_TO_MANY:String = 'manyToMany';
 		
+		
+		
+		
+		
+		
+		
 		/** @private */
-		protected var _calculateAngles:Boolean = false;
+		private var _alphaThreshold:uint = 1;
 		/** @private */
-		protected var _calculateOverlap:Boolean = false;
+		private var _calculateAngles:Boolean = false;
 		/** @private */
-		protected var _ignoreParentless:Boolean = true;
+		private var _calculateOverlap:Boolean = false;
 		/** @private */
-		protected var _ignoreInvisibles:Boolean = true;
+		private var _ignoreInvisibles:Boolean = true;
 		/** @private */
-		protected var _alphaThreshold:uint;
+		private var _ignoreParentless:Boolean = true;
+		/** @private */
+		private var _skip:uint = 0;
+		/** @private */
+		private var _skipCounter:uint = 0;
+		/** @private */
+		private var _debug:Boolean = false;
+		
+		/** @private */
+		private var _outlines:Sprite;
+		
 		/** @private **/
-		protected var _mode:String = MANY_TO_MANY;
+		private var _mode:String = MANY_TO_MANY;
 		
 		/** @private */
-		protected var objectArray:Vector.<DisplayObject>;
+		private var _detectionList:Vector.<DisplayObject>;
 		/** @private */
-		protected var objectCheckArray:Vector.<Vector.<DisplayObject>>;
+		private var _objectCheckArray:Vector.<Vector.<DisplayObject>>;
 		/** @private */
-		protected var objectCollisionArray:Vector.<Collision>;
+		private var _objectCollisionArray:Vector.<Collision>;
 		
 		/** @private */
-		protected var colorExclusionArray:Array;
-		/** @private */
-		protected var bmd1:BitmapData;
-		/** @private */
-		protected var bmd2:BitmapData;
-		/** @private */
-		protected var bmdResample:BitmapData;
-		/** @private */
-		protected var pixels1:ByteArray;
-		/** @private */
-		protected var pixels2:ByteArray;
-		/** @private */
-		protected var item1BoundingBox:Rectangle;
-		/** @private */
-		protected var item2BoundingBox:Rectangle;
-		/** @private */
-		protected var transMatrix1:Matrix;
-		/** @private */
-		protected var transMatrix2:Matrix;
-		/** @private */
-		protected var colorTransform1:ColorTransform;
-		/** @private */
-		protected var colorTransform2:ColorTransform;
-		/** @private */
-		protected var item1GlobalRegistrationPoint:Point;
-		/** @private */
-		protected var item2GlobalRegistrationPoint:Point;
+		private var _enterFrameCatcher:Shape;
+		
+		
+		
+		
 		
 		/** @private */
-		protected var _enterFrameCatcher:Shape;
+		private var _colorExclusionArray:Array;
 		/** @private */
-		private var _emptyPoint:Point = new Point();
-		
+		private var _bmd1:BitmapData;
 		/** @private */
-		protected var _skip:uint;
+		private var _bmd2:BitmapData;
 		/** @private */
-		protected var _skipCounter:uint;
-		
+		private var _bmdResample:BitmapData;
 		/** @private */
-		protected var _debug:Boolean = false;
+		private var _pixels1:ByteArray;
 		/** @private */
-		protected var _outlines:Sprite;
+		private var _pixels2:ByteArray;
+		/** @private */
+		private var _item1BoundingBox:Rectangle;
+		/** @private */
+		private var _item2BoundingBox:Rectangle;
+		/** @private */
+		private var _transMatrix1:Matrix;
+		/** @private */
+		private var _transMatrix2:Matrix;
+		/** @private */
+		private var _colorTransform1:ColorTransform;
+		/** @private */
+		private var _colorTransform2:ColorTransform;
+		/** @private */
+		private var _item1GlobalRegistrationPoint:Point;
+		/** @private */
+		private var _item2GlobalRegistrationPoint:Point;
 		
 		/**
 		 * Creates an <code>AirBag</code> object from the <code>DisplayObject</code>s passed as 
@@ -251,22 +258,20 @@ package cc.cote.airbag
 		
 		public function AirBag(...objects):void {
 			
-			objectCheckArray = new <Vector.<DisplayObject>>[];
-			objectCollisionArray = new <Collision>[];
-			objectArray = new <DisplayObject>[];
-			colorExclusionArray = [];
-			_alphaThreshold = 1;
-			_skip = 0;
-			_skipCounter = 0;
+			_objectCheckArray = new <Vector.<DisplayObject>>[];
+			_objectCollisionArray = new <Collision>[];
+			_detectionList = new <DisplayObject>[];
+			_colorExclusionArray = [];
 			
 			for each (var obj:* in objects) add(obj);
 			
 		}
 		
 		/**
-		 * Adds DisplayObjects to the detection list. Objects to add can be specified using any 
-		 * combination of the following data types: <code>Vector.&lt;DisplayObject&gt;</code>, 
-		 * <code>DisplayObject</code> or <code>Array</code> (of <code>DisplayObject</code>s).
+		 * Adds <code>DisplayObject</code>s to the detection list. Objects to add can be specified 
+		 * using any combination of the following data types: 
+		 * <code>Vector.&lt;DisplayObject&gt;</code>, <code>DisplayObject</code> or 
+		 * <code>Array</code> (of <code>DisplayObject</code>s).
 		 * 
 		 * @param objects 			A variable number of any of the following objects: 
 		 * 							<code>Vector.&lt;DisplayObject&gt;</code>, 
@@ -281,13 +286,13 @@ package cc.cote.airbag
 			
 			for each (var object:* in objects) {
 				
-				if (object is Vector.<DisplayObject>) {				// Vector.<DisplayObject>
-					objectArray = objectArray.concat(object);
-				} else if (object is DisplayObject) {				// DisplayObject
-					objectArray.push(object);
-				} else if (object is Array) {						// Array
+				if (object is Vector.<DisplayObject>) {
+					_detectionList = _detectionList.concat(object);
+				} else if (object is DisplayObject) {
+					_detectionList.push(object);
+				} else if (object is Array) {
 					for each (var obj:* in object) {
-						if (obj is DisplayObject) objectArray.push(obj);
+						if (obj is DisplayObject) _detectionList.push(obj);
 					}
 				} else {
 					throw new ArgumentError(
@@ -301,9 +306,10 @@ package cc.cote.airbag
 		}
 		
 		/**
-		 * Removes DisplayObjects from the detection list. Objects to remove can be specified using 
-		 * any combination of the following data types: <code>Vector.&lt;DisplayObject&gt;</code>, 
-		 * <code>DisplayObject</code> or <code>Array</code> (of <code>DisplayObject</code>s).
+		 * Removes <code>DisplayObjects</code> from the detection list. Objects to remove can be 
+		 * specified using any combination of the following data types: 
+		 * <code>Vector.&lt;DisplayObject&gt;</code>, <code>DisplayObject</code> or 
+		 * <code>Array</code> (of <code>DisplayObject</code>s).
 		 * 
 		 * @param objects 			A variable number of any of the following objects: 
 		 * 							Vector.&lt;DisplayObject&gt;, DisplayObject or Array of 
@@ -316,13 +322,13 @@ package cc.cote.airbag
 			
 			for each (var object:* in objects) {
 				
-				if (object is Vector.<DisplayObject>) {				// Vector.<DisplayObject>
+				if (object is Vector.<DisplayObject>) {
 					for each (var vObj:DisplayObject in object) {
 						_removeObject(vObj);
 					}
-				} else if (object is DisplayObject) {				// DisplayObject
+				} else if (object is DisplayObject) {
 					_removeObject(object);
-				} else if (object is Array) {						// Array
+				} else if (object is Array) {
 					for each (var aObj:* in object) {
 						if (aObj is DisplayObject) _removeObject(aObj);
 					}
@@ -338,15 +344,15 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _removeObject(obj:DisplayObject):void {
+		private function _removeObject(obj:DisplayObject):void {
 			
 			var start:uint = 0;
 			if (_mode == ONE_TO_MANY) start = 1;
 			
-			var loc:int = objectArray.indexOf(obj, start);
+			var loc:int = _detectionList.indexOf(obj, start);
 			
 			if(loc >= 0) {
-				objectArray.splice(loc, 1);
+				_detectionList.splice(loc, 1);
 			} else {
 				throw new ArgumentError(obj + " was not removed because it could not be found.");
 			}
@@ -359,7 +365,7 @@ package cc.cote.airbag
 		 * <code>excludeColor</code> are not affected by this method.
 		 */
 		public function clear():void {
-			objectArray = new <DisplayObject>[];
+			_detectionList = new <DisplayObject>[];
 			_mode = MANY_TO_MANY;
 		}
 		
@@ -377,8 +383,8 @@ package cc.cote.airbag
 		 */
 		public function detect():Vector.<Collision> {
 			
-			objectCheckArray = new <Vector.<DisplayObject>>[];
-			objectCollisionArray = new <Collision>[];
+			_objectCheckArray = new <Vector.<DisplayObject>>[];
+			_objectCollisionArray = new <Collision>[];
 			
 			if (debug) _drawDebuggingOutlines();
 			
@@ -391,10 +397,10 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _checkOneToManyCollisions():Vector.<Collision> {
+		private function _checkOneToManyCollisions():Vector.<Collision> {
 			
-			var NUM_OBJS:uint = objectArray.length;
-			var item1:DisplayObject = objectArray[0];
+			var NUM_OBJS:uint = _detectionList.length;
+			var item1:DisplayObject = _detectionList[0];
 			var item2:DisplayObject;
 			
 			if (ignoreParentless && !item1.parent) {
@@ -410,7 +416,7 @@ package cc.cote.airbag
 			}
 			
 			for(var i:uint = 1; i < NUM_OBJS; i++) {
-				item2 = objectArray[i];
+				item2 = _detectionList[i];
 				
 				if (ignoreParentless && !item2.parent) break;
 				
@@ -418,51 +424,51 @@ package cc.cote.airbag
 					
 //					// THIS IS SUPER FUCKING IMPORTANT FOR PERFORMANCE !!!!!!!!!
 					if((item2.width * item2.height) > (item1.width * item1.height)) {
-						objectCheckArray.push(new <DisplayObject>[item1,item2])
+						_objectCheckArray.push(new <DisplayObject>[item1,item2])
 					} else {
-						objectCheckArray.push(new <DisplayObject>[item2,item1]);
+						_objectCheckArray.push(new <DisplayObject>[item2,item1]);
 					}
 					
 				}
 				
 			}
 			
-			NUM_OBJS = objectCheckArray.length;
+			NUM_OBJS = _objectCheckArray.length;
 			var c:Collision = null;
 			for(i = 0; i < NUM_OBJS; i++) {
 				
 				if (calculateAngles || calculateOverlap) {
 					c = _findCollisionWithDetails(
-						objectCheckArray[i][0], objectCheckArray[i][1], 
+						_objectCheckArray[i][0], _objectCheckArray[i][1], 
 						calculateAngles, calculateOverlap
 					);
 				} else {
-					c = _findCollision(objectCheckArray[i][0], objectCheckArray[i][1]);
+					c = _findCollision(_objectCheckArray[i][0], _objectCheckArray[i][1]);
 				}
 				
-				c && objectCollisionArray.push(c);
+				c && _objectCollisionArray.push(c);
 				
 			}
 			
-			return objectCollisionArray;
+			return _objectCollisionArray;
 		}
 		
 		/** @private */
-		protected function _checkManyToManyCollisions():Vector.<Collision> { 
+		private function _checkManyToManyCollisions():Vector.<Collision> { 
 			
-			var NUM_OBJS:uint = objectArray.length;
+			var NUM_OBJS:uint = _detectionList.length;
 			var item1:DisplayObject;
 			var item2:DisplayObject;
 			
 			for(var i:uint = 0; i < NUM_OBJS - 1; i++) {
 				
-				item1 = objectArray[i];
+				item1 = _detectionList[i];
 				
 				if (ignoreParentless && !item1.parent) break;
 				if (ignoreInvisibles && !item1.visible) break;
 				
 				for(var j:uint = i + 1; j < NUM_OBJS; j++) {
-					item2 = objectArray[j];
+					item2 = _detectionList[j];
 					
 					if (ignoreParentless && !item2.parent) break;
 					if (ignoreInvisibles && !item2.visible) break;
@@ -471,9 +477,9 @@ package cc.cote.airbag
 						
 						// THIS IS SUPER FUCKING IMPORTANT !!!!!!!!!
 						if((item2.width * item2.height) > (item1.width * item1.height)) {
-							objectCheckArray.push(new <DisplayObject>[item1,item2])
+							_objectCheckArray.push(new <DisplayObject>[item1,item2])
 						} else {
-							objectCheckArray.push(new <DisplayObject>[item2,item1]);
+							_objectCheckArray.push(new <DisplayObject>[item2,item1]);
 						}
 					}
 					
@@ -481,29 +487,29 @@ package cc.cote.airbag
 				
 			}
 			
-			NUM_OBJS = objectCheckArray.length;
+			NUM_OBJS = _objectCheckArray.length;
 			var c:Collision = null;
 			for(i = 0; i < NUM_OBJS; i++) {
 				
 				if (calculateAngles || calculateOverlap) {
 					c = _findCollisionWithDetails(
-						objectCheckArray[i][0], objectCheckArray[i][1], 
+						_objectCheckArray[i][0], _objectCheckArray[i][1], 
 						calculateAngles, calculateOverlap
 					);
 				} else {
-					c = _findCollision(objectCheckArray[i][0], objectCheckArray[i][1]);
+					c = _findCollision(_objectCheckArray[i][0], _objectCheckArray[i][1]);
 				}
 				
-				c && objectCollisionArray.push(c);
+				c && _objectCollisionArray.push(c);
 			}
 			
-			return objectCollisionArray;
+			return _objectCollisionArray;
 		}
 		
 		/**
-		 * Starts the collision detection process. On <code>ENTER_FRAME</code>, <code>AirBag</code>
-		 * will check if any collisions happened and, if at least one was detected, it will dispatch 
-		 * a <code>CollisionEvent</code> object.
+		 * Starts the automated collision detection process. On <code>ENTER_FRAME</code>, 
+		 * <code>AirBag</code> will check if any collisions happened and, if at least one was 
+		 * detected, it will dispatch a <code>CollisionEvent</code> object.
 		 * 
 		 * <p>If you want to use a higher frame rate for your application than for collision 
 		 * detection, you can use the <code>skip</code> property.</p>
@@ -519,7 +525,7 @@ package cc.cote.airbag
 		}
 		
 		/**
-		 * Stops the collision detection process.
+		 * Stops the automated collision detection process.
 		 * 
 		 * @since 1.0a rev1
 		 */
@@ -528,7 +534,7 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _onEnterFrame(e:Event):void {
+		private function _onEnterFrame(e:Event):void {
 			
 			if (_skipCounter % (_skip + 1) == 0) {
 				
@@ -560,8 +566,8 @@ package cc.cote.airbag
 			if (_enterFrameCatcher.hasEventListener(Event.ENTER_FRAME)) {
 				_enterFrameCatcher.removeEventListener(Event.ENTER_FRAME, _onEnterFrame);
 			}
+			_outlines.graphics.clear();
 		}
-		
 		
 		/**
 		 * Adds a color to the color exclusion list. Pixels whose values are within the specified 
@@ -581,9 +587,9 @@ package cc.cote.airbag
 			blueRange:uint = 20
 		):void {
 			
-			var numColors:int = colorExclusionArray.length;
+			var numColors:int = _colorExclusionArray.length;
 			for (var i:uint = 0; i < numColors; i++) {
-				if (colorExclusionArray[i].color == color) return; // fail silently
+				if (_colorExclusionArray[i].color == color) return; // fail silently
 			}
 			
 			var aPlus:uint;
@@ -615,7 +621,7 @@ package cc.cote.airbag
 				bPlus:bPlus, 
 				bMinus:bMinus
 			};
-			colorExclusionArray.push(colorExclusion);
+			_colorExclusionArray.push(colorExclusion);
 		}
 		
 		/**
@@ -627,11 +633,11 @@ package cc.cote.airbag
 		public function removeColorFromExclusionList(theColor:uint):void
 		{
 			var found:Boolean = false;
-			var numColors:int = colorExclusionArray.length;
+			var numColors:int = _colorExclusionArray.length;
 			
 			for(var i:uint = 0; i < numColors; i++) {
-				if(colorExclusionArray[i].color == theColor) {
-					colorExclusionArray.splice(i, 1);
+				if(_colorExclusionArray[i].color == theColor) {
+					_colorExclusionArray.splice(i, 1);
 					found = true;
 					break;
 				}
@@ -646,31 +652,33 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _findCollision(item1:DisplayObject, item2:DisplayObject):Collision {
+		private function _findCollision(item1:DisplayObject, item2:DisplayObject):Collision {
 			
 			// Plot the registration point of both items in the global coordinate space (from their 
 			// local coordinates). The localToGlobal() method takes into account any transformations 
 			// that have been applied to parents so we don't need to worry about that.
-			item1GlobalRegistrationPoint = item1.localToGlobal(new Point());
-			item2GlobalRegistrationPoint = item2.localToGlobal(new Point());
+			_item1GlobalRegistrationPoint = item1.localToGlobal(new Point());
+			_item2GlobalRegistrationPoint = item2.localToGlobal(new Point());
 			
-			// Retrieve the transformation matrices (we will modify them below)
-			transMatrix1 = item1.transform.matrix;
-			transMatrix2 = item2.transform.matrix;
+			// Retrieve the transformation matrices for both objects (we will modify them below). If 
+			// no matrix has been set (such as with a TextField for example) assign an identity 
+			// matrix.
+			_transMatrix1 = item1.transform.matrix ? item1.transform.matrix : new Matrix();
+			_transMatrix2 = item2.transform.matrix ? item2.transform.matrix : new Matrix();
 			
 			// Combine matrices of item1 and those of all its parents into a single one that can be
 			// used at the global level. At the same time, grab the bounding box rectangle (in the
 			// coordinate space of its top-level parent).
 			var currentObj:DisplayObject = item1;
 			while (currentObj.parent != null) {
-				transMatrix1.concat(currentObj.parent.transform.matrix);
+				_transMatrix1.concat(currentObj.parent.transform.matrix);
 				currentObj = currentObj.parent;
 			}
 			
-			item1BoundingBox = item1.getBounds(currentObj);
+			_item1BoundingBox = item1.getBounds(currentObj);
 			if (item1 != currentObj) {
-				item1BoundingBox.x += currentObj.x;
-				item1BoundingBox.y += currentObj.y;
+				_item1BoundingBox.x += currentObj.x;
+				_item1BoundingBox.y += currentObj.y;
 			}
 			
 			// Combine matrices of item2 and those of all its parents into a single one that can be
@@ -678,14 +686,14 @@ package cc.cote.airbag
 			// coordinate space of its top-level parent).
 			currentObj = item2;
 			while(currentObj.parent != null) {
-				transMatrix2.concat(currentObj.parent.transform.matrix);
+				_transMatrix2.concat(currentObj.parent.transform.matrix);
 				currentObj = currentObj.parent;
 			}
 			
-			item2BoundingBox = item2.getBounds(currentObj);
+			_item2BoundingBox = item2.getBounds(currentObj);
 			if (item2 != currentObj) {
-				item2BoundingBox.x += currentObj.x;
-				item2BoundingBox.y += currentObj.y;
+				_item2BoundingBox.x += currentObj.x;
+				_item2BoundingBox.y += currentObj.y;
 			}
 			
 			// Fetch the rectangle that represents the intersection of the items' bounding boxes.
@@ -693,7 +701,7 @@ package cc.cote.airbag
 			// rectangles with a dimension (width or height) that is smaller than a pixel. So, we 
 			// need to make sure those are accounted for [using Math.ceil()]. This also performs the 
 			// necessary rounding (before drawing) by the same token.
-			var intersect:Rectangle = item1BoundingBox.intersection(item2BoundingBox);
+			var intersect:Rectangle = _item1BoundingBox.intersection(_item2BoundingBox);
 			if (intersect.isEmpty()) return null; // THIS IS WEIRD !!!
 			intersect.width = Math.ceil(intersect.width);
 			intersect.height = Math.ceil(intersect.height);
@@ -703,21 +711,21 @@ package cc.cote.airbag
 			
 			// Calculate the offset between the intersection zone's registration points and the 
 			// objects' registration points so we draw them at the right place.
-			transMatrix1.tx = (item1GlobalRegistrationPoint.x - intersect.x);
-			transMatrix1.ty = (item1GlobalRegistrationPoint.y - intersect.y);
-			transMatrix2.tx = (item2GlobalRegistrationPoint.x - intersect.x);
-			transMatrix2.ty = (item2GlobalRegistrationPoint.y - intersect.y);
+			_transMatrix1.tx = (_item1GlobalRegistrationPoint.x - intersect.x);
+			_transMatrix1.ty = (_item1GlobalRegistrationPoint.y - intersect.y);
+			_transMatrix2.tx = (_item2GlobalRegistrationPoint.x - intersect.x);
+			_transMatrix2.ty = (_item2GlobalRegistrationPoint.y - intersect.y);
 			
 			// Create two transparent BitmapDatas the size of the intersection zone and draw only
 			// what is that zone for each item.
-			bmd1 = new BitmapData(intersect.width, intersect.height, true, 0);  
-			bmd2 = new BitmapData(intersect.width, intersect.height, true, 0);
-			bmd1.draw(item1, transMatrix1, item1.transform.colorTransform, null, null, true);
-			bmd2.draw(item2, transMatrix2, item2.transform.colorTransform, null, null, true);
+			_bmd1 = new BitmapData(intersect.width, intersect.height, true, 0);  
+			_bmd2 = new BitmapData(intersect.width, intersect.height, true, 0);
+			_bmd1.draw(item1, _transMatrix1, item1.transform.colorTransform, null, null, true);
+			_bmd2.draw(item2, _transMatrix2, item2.transform.colorTransform, null, null, true);
 
 			// Perform the actual collision detection
 			var recordedCollision:Collision = null;
-			if( bmd1.hitTest(_emptyPoint, _alphaThreshold, bmd2, _emptyPoint, _alphaThreshold) ) {
+			if( _bmd1.hitTest(new Point(), _alphaThreshold, _bmd2, new Point(), _alphaThreshold) ) {
 				
 				// If a singleTarget has been defined, put it first for convenience
 				var output:Vector.<DisplayObject> = new <DisplayObject>[item1, item2];
@@ -728,8 +736,8 @@ package cc.cote.airbag
 			}
 			
 			// Properly free memory used be the BitmapDatas
-			bmd1.dispose();
-			bmd2.dispose();
+			_bmd1.dispose();
+			_bmd2.dispose();
 			
 			// Return collision (if found) or null otherwise
 			return recordedCollision;
@@ -737,14 +745,14 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _drawDebuggingIntersect(box:Rectangle):void {
+		private function _drawDebuggingIntersect(box:Rectangle):void {
 			_outlines.graphics.beginFill(0x00FF00, .5)
 			_outlines.graphics.moveTo(box.x, box.y);
 			_outlines.graphics.drawRect(box.x, box.y, box.width, box.height);
 		}
 		
 		/** @private */
-		protected function _findCollisionWithDetails(
+		private function _findCollisionWithDetails(
 			item1:DisplayObject, 
 			item2:DisplayObject, 
 			calculateAngles:Boolean = false,
@@ -776,60 +784,60 @@ package cc.cote.airbag
 			//				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
 			//			}
 			
-			colorTransform1 = item1.transform.colorTransform;
-			colorTransform2 = item2.transform.colorTransform;
+			_colorTransform1 = item1.transform.colorTransform;
+			_colorTransform2 = item2.transform.colorTransform;
 			
 			// We store 0,0 of the item in global coordinates
-			item1GlobalRegistrationPoint = new Point();
-			item2GlobalRegistrationPoint = new Point();
-			item1GlobalRegistrationPoint = item1.localToGlobal(item1GlobalRegistrationPoint);
-			item2GlobalRegistrationPoint = item2.localToGlobal(item2GlobalRegistrationPoint);
+			_item1GlobalRegistrationPoint = new Point();
+			_item2GlobalRegistrationPoint = new Point();
+			_item1GlobalRegistrationPoint = item1.localToGlobal(_item1GlobalRegistrationPoint);
+			_item2GlobalRegistrationPoint = item2.localToGlobal(_item2GlobalRegistrationPoint);
 			
 			
 			
 			// We create transparent BitmapDatas for both items
-			bmd1 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);  
-			bmd2 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);
+			_bmd1 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);  
+			_bmd2 = new BitmapData(item1.width, item1.height, true, 0x00FFFFFF);
 			
 			// we recuperate the transform matrix for object 1
-			transMatrix1 = item1.transform.matrix;
+			_transMatrix1 = item1.transform.matrix;
 			
 			// Combine matrices of the object1 and all parents into one
 			var currentObj:DisplayObject = item1;
 			while (currentObj.parent != null) {
-				transMatrix1.concat(currentObj.parent.transform.matrix);
+				_transMatrix1.concat(currentObj.parent.transform.matrix);
 				currentObj = currentObj.parent;
 			}
 			
 			// Get bounds of item1 (accounting for parent movement if any)
-			item1BoundingBox = item1.getBounds(currentObj);
+			_item1BoundingBox = item1.getBounds(currentObj);
 			if (item1 != currentObj) {
-				item1BoundingBox.x += currentObj.x;
-				item1BoundingBox.y += currentObj.y;
+				_item1BoundingBox.x += currentObj.x;
+				_item1BoundingBox.y += currentObj.y;
 			}
 			
 			// We take the global registration point and calculate a global translation point for the 
 			// matrix
-			transMatrix1.tx = item1xDiff = (item1GlobalRegistrationPoint.x - item1BoundingBox.left);
-			transMatrix1.ty = item1yDiff = (item1GlobalRegistrationPoint.y - item1BoundingBox.top);
+			_transMatrix1.tx = item1xDiff = (_item1GlobalRegistrationPoint.x - _item1BoundingBox.left);
+			_transMatrix1.ty = item1yDiff = (_item1GlobalRegistrationPoint.y - _item1BoundingBox.top);
 			
 			// we recuperate the transform matrix for object 2
-			transMatrix2 = item2.transform.matrix;
+			_transMatrix2 = item2.transform.matrix;
 			
 			// Combine matrices of the object2 and all parents into one
 			currentObj = item2;
 			while(currentObj.parent != null) {
-				transMatrix2.concat(currentObj.parent.transform.matrix);
+				_transMatrix2.concat(currentObj.parent.transform.matrix);
 				currentObj = currentObj.parent;
 			}
 			
-			transMatrix2.tx = (item2GlobalRegistrationPoint.x - item1BoundingBox.left);
-			transMatrix2.ty = (item2GlobalRegistrationPoint.y - item1BoundingBox.top);
+			_transMatrix2.tx = (_item2GlobalRegistrationPoint.x - _item1BoundingBox.left);
+			_transMatrix2.ty = (_item2GlobalRegistrationPoint.y - _item1BoundingBox.top);
 			
 			
 			// Draw outlines for debugging purposes (if requested)
 			if (_debug) {
-				var intersect:Rectangle = item1BoundingBox.intersection(item2.getBounds(currentObj));
+				var intersect:Rectangle = _item1BoundingBox.intersection(item2.getBounds(currentObj));
 				if (!intersect.isEmpty()) {
 					intersect.width = Math.ceil(intersect.width);
 					intersect.height = Math.ceil(intersect.height);
@@ -842,11 +850,11 @@ package cc.cote.airbag
 			
 			
 			// We finally draw
-			bmd1.draw(item1, transMatrix1, colorTransform1, null, null, true);
-			bmd2.draw(item2, transMatrix2, colorTransform2, null, null, true);
+			_bmd1.draw(item1, _transMatrix1, _colorTransform1, null, null, true);
+			_bmd2.draw(item2, _transMatrix2, _colorTransform2, null, null, true);
 			
-			pixels1 = bmd1.getPixels(new Rectangle(0, 0, bmd1.width, bmd1.height));
-			pixels2 = bmd2.getPixels(new Rectangle(0, 0, bmd1.width, bmd1.height));	
+			_pixels1 = _bmd1.getPixels(new Rectangle(0, 0, _bmd1.width, _bmd1.height));
+			_pixels2 = _bmd2.getPixels(new Rectangle(0, 0, _bmd1.width, _bmd1.height));	
 			
 			var k:uint = 0;
 			var value1:uint = 0;
@@ -857,20 +865,20 @@ package cc.cote.airbag
 			var locY:Number;
 			var locX:Number;
 			var locStage:Point;
-			var hasColors:int = colorExclusionArray.length;
+			var hasColors:int = _colorExclusionArray.length;
 			
-			pixels1.position = 0;
-			pixels2.position = 0;
+			_pixels1.position = 0;
+			_pixels2.position = 0;
 			
-			var pixelLength:int = pixels1.length;
+			var pixelLength:int = _pixels1.length;
 			while(k < pixelLength)
 			{
-				k = pixels1.position;
+				k = _pixels1.position;
 				
 				try
 				{
-					value1 = pixels1.readUnsignedInt();
-					value2 = pixels2.readUnsignedInt();
+					value1 = _pixels1.readUnsignedInt();
+					value2 = _pixels2.readUnsignedInt();
 				}
 				catch(e:EOFError)
 				{
@@ -893,7 +901,7 @@ package cc.cote.airbag
 						
 						for(var n:uint = 0; n < hasColors; n++)
 						{
-							colorObj = Object(colorExclusionArray[n]);
+							colorObj = Object(_colorExclusionArray[n]);
 							
 							item1Flags = 0;
 							item2Flags = 0;
@@ -942,7 +950,7 @@ package cc.cote.airbag
 							
 							collisionPoint = k >> 2;
 							
-							locY = collisionPoint / bmd1.width, locX = collisionPoint % bmd1.width;
+							locY = collisionPoint / _bmd1.width, locX = collisionPoint % _bmd1.width;
 							
 							locY -= item1yDiff;
 							locX -= item1xDiff;
@@ -958,11 +966,11 @@ package cc.cote.airbag
 				
 			}
 			
-			bmd1.dispose();
-			bmd2.dispose();
+			_bmd1.dispose();
+			_bmd2.dispose();
 			
-			pixels1.clear();
-			pixels2.clear();
+			_pixels1.clear();
+			_pixels2.clear();
 			
 			var recordedCollision:Collision = null;
 			
@@ -974,7 +982,7 @@ package cc.cote.airbag
 				if (item2 == singleTarget) output.reverse();
 				
 				recordedCollision = new Collision(output, angle, overlapping);
-				objectCollisionArray.push(recordedCollision);
+				_objectCollisionArray.push(recordedCollision);
 			}
 			
 			if(item1IsUsingAdvancedAntiAliasing) (item1 as TextField).antiAliasType = "advanced";
@@ -988,7 +996,7 @@ package cc.cote.airbag
 		}
 		
 		/** @private */
-		protected function _drawDebuggingOutlines():void {
+		private function _drawDebuggingOutlines():void {
 			
 			var targetSpace:DisplayObject = _outlines.parent;
 			if (!targetSpace) return;
@@ -996,41 +1004,39 @@ package cc.cote.airbag
 			_outlines.graphics.clear();
 			
 			var box:Rectangle;
-			for each (var obj:DisplayObject in objectArray) {
+			for each (var obj:DisplayObject in _detectionList) {
 				box = obj.getBounds(targetSpace);
 				_outlines.graphics.lineStyle(1, 0x555555, .75);
 				_outlines.graphics.moveTo(box.x, box.y);
 				_outlines.graphics.drawRect(box.x, box.y, box.width, box.height);
 			}
 			
-			
-			
 		}
 		
 		/** @private */
-		protected function _findAngle(item1:DisplayObject, item2:DisplayObject):Number {
+		private function _findAngle(item1:DisplayObject, item2:DisplayObject):Number {
 			var center:Point = new Point((item1.width >> 1), (item1.height >> 1));
-			var pixels:ByteArray = pixels2;
-			transMatrix2.tx += center.x;
-			transMatrix2.ty += center.y;
-			bmdResample = new BitmapData(item1.width << 1, item1.height << 1, true, 0x00FFFFFF);
-			bmdResample.draw(item2, transMatrix2, colorTransform2, null, null, true);
-			pixels = bmdResample.getPixels(
-				new Rectangle(0, 0, bmdResample.width, bmdResample.height)
+			var pixels:ByteArray = _pixels2;
+			_transMatrix2.tx += center.x;
+			_transMatrix2.ty += center.y;
+			_bmdResample = new BitmapData(item1.width << 1, item1.height << 1, true, 0x00FFFFFF);
+			_bmdResample.draw(item2, _transMatrix2, _colorTransform2, null, null, true);
+			pixels = _bmdResample.getPixels(
+				new Rectangle(0, 0, _bmdResample.width, _bmdResample.height)
 			);
 			
-			center.x = bmdResample.width >> 1;
-			center.y = bmdResample.height >> 1;
+			center.x = _bmdResample.width >> 1;
+			center.y = _bmdResample.height >> 1;
 			
-			var columnHeight:uint = Math.round(bmdResample.height);
-			var rowWidth:uint = Math.round(bmdResample.width);
-			bmdResample.dispose();
+			var columnHeight:uint = Math.round(_bmdResample.height);
+			var rowWidth:uint = Math.round(_bmdResample.width);
+			_bmdResample.dispose();
 			
 			var pixel:uint;
 			var thisAlpha:uint;
 			var lastAlpha:int;
 			var edgeArray:Array = [];
-			var hasColors:int = colorExclusionArray.length;
+			var hasColors:int = _colorExclusionArray.length;
 			
 			for(var j:uint = 0; j < columnHeight; j++) {
 				var k:uint = (j * rowWidth) << 2;
@@ -1063,7 +1069,7 @@ package cc.cote.airbag
 								
 								for(var n:uint = 0; n < hasColors; n++)
 								{
-									colorObj = Object(colorExclusionArray[n]);
+									colorObj = Object(_colorExclusionArray[n]);
 									
 									item1Flags = 0;
 									if((blue1 >= colorObj.bMinus) && (blue1 <= colorObj.bPlus))
@@ -1125,7 +1131,7 @@ package cc.cote.airbag
 		 * <code>singleTarget</code> if it has been defined.
 		 */
 		public function get numObjects():uint {
-			return objectArray.length;
+			return _detectionList.length;
 		}
 		
 		/** 
@@ -1141,7 +1147,7 @@ package cc.cote.airbag
 		public function get singleTarget():DisplayObject {
 			
 			if (_mode == ONE_TO_MANY) {
-				return objectArray[0];
+				return _detectionList[0];
 			} else {
 				return null;
 			}
@@ -1154,14 +1160,14 @@ package cc.cote.airbag
 			if (target) {
 				if (_mode == MANY_TO_MANY) {
 					_mode = ONE_TO_MANY;
-					objectArray.unshift(target);
+					_detectionList.unshift(target);
 				} else {
-					objectArray[0] = target;
+					_detectionList[0] = target;
 				}
 			} else {
 				if (_mode == ONE_TO_MANY) {
 					_mode = MANY_TO_MANY;
-					objectArray.shift();
+					_detectionList.shift();
 				}
 			}
 			
