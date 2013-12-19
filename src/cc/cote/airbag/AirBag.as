@@ -32,7 +32,6 @@ package cc.cote.airbag
 	import flash.errors.IllegalOperationError;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
-	import flash.geom.ColorTransform;
 	import flash.geom.Matrix;
 	import flash.geom.Point;
 	import flash.geom.Rectangle;
@@ -116,7 +115,7 @@ package cc.cote.airbag
 	 * 
 	 * <listing version="3.0">
 	 * public var airbag:AirBag = new AirBag(obj1, obj2, obj3);
-	 * airbag.singleTarget(obj4);</listing>
+	 * airbag.singleTarget = obj4;</listing>
 	 * 
 	 * <p>This will report all collisions of <code>obj1</code>, <code>obj2</code> and 
 	 * <code>obj3</code> with <code>obj4</code> but won't report collisions of <code>obj1</code>, 
@@ -218,10 +217,6 @@ package cc.cote.airbag
 		private var _transMatrix1:Matrix;
 		/** @private */
 		private var _transMatrix2:Matrix;
-		/** @private */
-		private var _colorTransform1:ColorTransform;
-		/** @private */
-		private var _colorTransform2:ColorTransform;
 		/** @private */
 		private var _item1GlobalRegistrationPoint:Point;
 		/** @private */
@@ -706,7 +701,7 @@ package cc.cote.airbag
 			intersect.width = Math.ceil(intersect.width);
 			intersect.height = Math.ceil(intersect.height);
 
-			// If we are in debugging mode, draw the intersection zone
+			// If we are in debugging mode, draw the intersection zone in the debugging Sprite
 			if (_debug) _drawDebuggingIntersect(intersect);
 			
 			// Calculate the offset between the intersection zone's registration points and the 
@@ -759,39 +754,28 @@ package cc.cote.airbag
 			includeOverlapData:Boolean = false
 		):Collision {
 			
-			var item1IsUsingAdvancedAntiAliasing:Boolean = false;
-			var item2IsUsingAdvancedAntiAliasing:Boolean = false;
 			var item1xDiff:Number;
 			var item1yDiff:Number;
 			
 			// If the item is a Textfield and is using "advanced" anti-aliasing, switch it to
 			// "normal" anti-aliasing while we perform detection
+			var item1IsUsingAdvancedAntiAliasing:Boolean = false;
 			if (item1 is TextField && (item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) {
 				item1IsUsingAdvancedAntiAliasing = true;
 				(item1 as TextField).antiAliasType = AntiAliasType.NORMAL;
-				
-				//				item1IsUsingAdvancedAntiAliasing = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? true : false;
-				//				(item1 as TextField).antiAliasType = ((item1 as TextField).antiAliasType == AntiAliasType.ADVANCED) ? AntiAliasType.NORMAL : (item1 as TextField).antiAliasType;
 			}
 			
+			var item2IsUsingAdvancedAntiAliasing:Boolean = false;
 			if (item2 is TextField && (item2 as TextField).antiAliasType == AntiAliasType.ADVANCED) {
 				item2IsUsingAdvancedAntiAliasing = true;
 				(item2 as TextField).antiAliasType = AntiAliasType.NORMAL;
 			}
 			
-			//			if(item2 is TextField) {
-			//				item2IsUsingAdvancedAntiAliasing = ((item2 as TextField).antiAliasType == "advanced") ? true : false;
-			//				(item2 as TextField).antiAliasType = ((item2 as TextField).antiAliasType == "advanced") ? "normal" : (item2 as TextField).antiAliasType;
-			//			}
-			
-			_colorTransform1 = item1.transform.colorTransform;
-			_colorTransform2 = item2.transform.colorTransform;
-			
-			// We store 0,0 of the item in global coordinates
-			_item1GlobalRegistrationPoint = new Point();
-			_item2GlobalRegistrationPoint = new Point();
-			_item1GlobalRegistrationPoint = item1.localToGlobal(_item1GlobalRegistrationPoint);
-			_item2GlobalRegistrationPoint = item2.localToGlobal(_item2GlobalRegistrationPoint);
+			// Plot the registration point of both items in the global coordinate space (from their 
+			// local coordinates). The localToGlobal() method takes into account any transformations 
+			// that have been applied to parents so we don't need to worry about that.
+			_item1GlobalRegistrationPoint = item1.localToGlobal(new Point());
+			_item2GlobalRegistrationPoint = item2.localToGlobal(new Point());
 			
 			
 			
@@ -850,8 +834,8 @@ package cc.cote.airbag
 			
 			
 			// We finally draw
-			_bmd1.draw(item1, _transMatrix1, _colorTransform1, null, null, true);
-			_bmd2.draw(item2, _transMatrix2, _colorTransform2, null, null, true);
+			_bmd1.draw(item1, _transMatrix1, item1.transform.colorTransform, null, null, true);
+			_bmd2.draw(item2, _transMatrix2, item2.transform.colorTransform, null, null, true);
 			
 			_pixels1 = _bmd1.getPixels(new Rectangle(0, 0, _bmd1.width, _bmd1.height));
 			_pixels2 = _bmd2.getPixels(new Rectangle(0, 0, _bmd1.width, _bmd1.height));	
@@ -1020,7 +1004,7 @@ package cc.cote.airbag
 			_transMatrix2.tx += center.x;
 			_transMatrix2.ty += center.y;
 			_bmdResample = new BitmapData(item1.width << 1, item1.height << 1, true, 0x00FFFFFF);
-			_bmdResample.draw(item2, _transMatrix2, _colorTransform2, null, null, true);
+			_bmdResample.draw(item2, _transMatrix2, item2.transform.colorTransform, null, null, true);
 			pixels = _bmdResample.getPixels(
 				new Rectangle(0, 0, _bmdResample.width, _bmdResample.height)
 			);
