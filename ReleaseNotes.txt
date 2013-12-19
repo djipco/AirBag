@@ -4,11 +4,14 @@ Release notes
 ********************************************************************************
 1.0a rev4
 
-	- Anything 'protected' is now 'private'. If I decide to make it better 
-	  extendable, I'll add protected getters and setters.
+	- Anything 'protected' is now 'private'. If I ever decide to make it more 
+	  extendable, I'll add protected getters and setters. I'll keep it safe for
+	  now.
 	  
 	- TextFields without matrices do not throw errors anymore (identity matrix
 	  used).
+	  
+	- Fixed typos in the documentation.
 
 ********************************************************************************
 1.0a rev3
