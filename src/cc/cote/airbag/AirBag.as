@@ -146,7 +146,7 @@ package cc.cote.airbag
 	public class AirBag extends EventDispatcher
 	{
 		/** Current version of the library. */
-		public static const VERSION:String = '1.0a rev3';
+		public static const VERSION:String = '1.0a rev4';
 		
 		/** Constant defining a ONE_TO_MANY detection mode. */
 		public static const ONE_TO_MANY:String = 'oneToMany';
