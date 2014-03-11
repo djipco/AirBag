@@ -148,10 +148,10 @@ package cc.cote.airbag
 		/** Current version of the library. */
 		public static const VERSION:String = '1.0a rev4';
 		
-		/** Constant defining a ONE_TO_MANY detection mode. */
+		/** Constant defining a ONE_TO_MANY detection mode. TARGETED_MODE */
 		public static const ONE_TO_MANY:String = 'oneToMany';
 		
-		/** Constant defining a MANY_TO_MANY detection mode. */
+		/** Constant defining a MANY_TO_MANY detection mode. BRAWL_MODE  */
 		public static const MANY_TO_MANY:String = 'manyToMany';
 		
 		
